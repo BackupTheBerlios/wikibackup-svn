@@ -1,156 +1,137 @@
+<?php
+/*****************************************************************************
+
+    This file is part of the WikiBackup MediaWiki Extension.
+
+    The WikiBackup MediaWiki Extension is free software: you can redistribute
+    it and/or modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this software.  If not, see <http://www.gnu.org/licenses/>.
+
+****************************************************************************/
+
 if ( !defined( 'MEDIAWIKI' ) ) {
-        echo <<<EOT
-To install my extension, put the following line in LocalSettings.php:
-require_once( "$IP/extensions/MyExtension/MyExtension.php" );
-EOT;
+        echo "WikiBackup extension";
         exit( 1 );
 }
- 
-$dir = dirname( __FILE__ ) . '/';
- 
-$wgAutoloadClasses[ 'WikiBackup' ] = $dir . 'WikiBackup.php';
-$wgExtensionMessagesFiles[ 'WikiBackup' ] = $dir . 'WikiBackup.i18n.php';
-$wgSpecialPages[ 'Backup' ] = 'SpecialBackup';
-$wgHooks[ 'LanguageGetSpecialPageAliases' ][] = 'WikiBackupLocalizedPageName';
- 
-function WikiBackupLocalizedPageName( &$specialPageArray, $code ) {
-  # The localized title of the special page is among the messages of the extension:
-  wfLoadExtensionMessages( 'WikiBackup' );
-  $text = wfMsg( "backup" );
- 
-  # Convert from title in text form to DBKey and put it into the alias array:
-  $title = Title::newFromText( $text );
-  $specialPageArray['Backup'][] = $title->getDBKey();
- 
-  return true;
+
+$dir = dirname(__FILE__) . '/';
+$wgAutoloadClasses['SpecialBackup'] = $dir . 'WikiBackup_body.php';
+$wgExtensionMessagesFiles['SpecialBackup'] = $dir . 'WikiBackup.i18n.php';
+$wgSpecialPages['Backup'] = 'SpecialBackup';
+
+$wgExtensionCredits[ 'specialpage' ][] = array(
+        'name'           => "WikiBackup",
+        'description'    => "Makes complete backups of the MediaWiki database.",
+        'descriptionmsg' => "backup-desc",
+        'version'        => 0.5,
+        'author'         => "Tyler Romeo",
+        'url'            => "http://www.mediawiki.org/wiki/Extension:WikiBackup"
+ );
+
+$wgEnotifBackups = true;
+
+// Displays message at logon
+$wgHooks['UserLoginComplete'][] = 'fnBackupNotify';
+// Adds notification preferences
+global $wgEnotifBackups;
+if( $wgEnotifBackups === true ) {
+	$wgHooks['InitPreferencesForm'][] = 'BackupInitPreferencesForm';
+	$wgHooks['PreferencesUserInformationPanel'][] = "BackupRenderPreferencesForm";
+	$wgHooks['ResetPreferences'][] = 'BackupResetPreferences';
+	$wgHooks['SavePreferences'][] = 'BackupSavePreferences';
+}
+// Adds backup parser functions
+if( $wgEnableBackupMagic === true ) {
+	$wgExtensionFunctions[] = 'BackupParserSetup';
+	$wgHooks['LanugageGetMagic'][] = 'BackupParserMagic';
+}
+
+// Checks if user can receive emails and has a valid email address.
+function canUserEmail() {
+	global $wgUser;
+	$wgUser->load();
+	if( !$wgUser->isAllowed( 'mysql-backup' ) || !$wgUser->isEmailConfirmed() ) { return false; }
+	return true;
 }
 
 
-class SpecialBackup extends SpecialPage {
-	public function MyExtension() {
-                SpecialPage::SpecialPage("MyExtension");
-                wfLoadExtensionMessages('MyExtension');
-        }
+/**********************************************
+	EMAIL NOTIFICATION FUNCTIONS
+ **********************************************/
 
-	public function execute() {
-		global $wgRequest, $wgOut, $wgUser;
-		if( !$wgUser->isAllowed( 'mysql-backup' ) || $wgUser->isBlocked() ) {
-			$wgOut->showErrorPage( "Permission Denied", "permissionserror" );
-			return false;
-		}
-		if( $wgRequest->getText( 'action' ) == "backupsubmit" ) {
-			return executeBackup();
-		} elseif( $wgRequest->getText( 'action' ) == "backupdelete" ) {
-			return deleteBackup( $wgRequest->getText( 'jobid' ) );
-		} else {
-			return mainBackupPage();
-		}
+// Adds backup notice if backup is complete.
+function fnBackupNotify( &$user, &$output ) {
+	global $wgArticlePath;
+	$dbr =& wfGetDB( DB_SLAVE );
+	$lastbackup = $dbr->fetcjObject( $dbr->select( 'user', 'lastbackup', array( 'user_id' => $user->getID() ) ) );
+	if( ereg( "DONE", $lastbackup ) ) {
+		$output .= "<div class=\"usermessage plainlinks\">" . wfMsg( 'backup-notify', $wgArticlePath ) . "</div>";
 	}
+	return true;
+}
 
-	private function executeBackup() {
-		global $wgUser;
-		$WikiBackup = new WikiBackup();
-		$WikiBackup->execute( $wgUser->getName() );
-		global $wgBackupWaitTime;
-		if( $wgBackupWaitTime < 1 ) {
-			sleep( 3 );
-		} else {
-			sleep( $wgBackupWaitTime );
-		}
-		return mainBackupPage( wfMsg( 'backup-submitted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
-	}
+// Hook for PreferencesForm consructor
+function BackupInitPreferencesForm( &$prefs, &$request ) {
+	if( !canUserEmail() ) { return true; }
+	$prefs->mToggles['backup-email'] = $request->getVal( 'wpBackupEmail' );
+	return true;
+}
 
-	private function deleteBackup( $backupId ) {
-		$WikiBackup = new WikiBackup( $backupId );
-		$WikiBackup->delete( $backupId );
-		return mainBackupPage( wfMsg( 'backup-deleted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
-	}
+// Adds checkbox for email notifications of backup completion
+function BackupRenderPreferencesForm( &$form, &$html ) {
+	if( !canUserEmail() ) { return true; }
+	wfLoadExtensionMessages( 'SpecialBackup' );
+	$html .= $form->tableRow( wfMsg( 'backup-email-desc' ), Xml::checkLabel( wfMsgExt( 'backup-email-label', array( 'escapenoentities' ) ), 'wpBackupEmail', 'wpBackupEmail', $prefsForm->mToggles['backup-email'] ) );
+	return true;
+}
 
-	private function mainBackupPage( $msg = false, $error = 'error' ) {
-		$WikiBackup = new WikiBackup();
-		$retval = "";
-		if( !$msg ) {
-			$retval .= "<div class='$error'><p>$message</p></div>\n";
-		}
-		$retval .= wfMsg( "backup-header" ) . "\n";
-		$retval .= "<form action='index.php?title=Special:Backup&action=backupsubmit' method='POST'>";
-		$retval .= "<input name='StartJob' value='New Backup' type='submit' /></form>\n\n";
-		$AllJobs = $WikiBackup->generateJobList();
-		$retval .= "<ul class='special'>\n";
-		foreach( $AllJobs as $Job ) {
-			if( $Job[ 'status' ] == "DONE" ) {
-				global $wgBackupPath, $wgBackupName;
-				$DeleteButton = "<form action='index.php?title=Special:Backup&action=backupdelete' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Delete' value='Delete' /></form>";
-				$retval .= wfMsg( 'backup-job', date( "H:i, j F o" $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ], "$wgBackupPath/$wgBackupName " . $Job[ 'timestamp' ], $DeleteButton );
-				$retval .= "\n";
-			} else {
-				$retval .= wfMsg( 'backup-job', date( "H:i, j F o" $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ] );
-				$retval .= "\n";
-			}
-		}
-		$retval .= "</ul>\n";
-		$retval .= wfMsg( 'backup-footer' ) . "\n";
-		$wgOut->addHTML( $retval );
-		unset( $WikiBackup );
-		return true;
-	}
+// Hook for ResetPrefs button
+function BackupResetPreferences( &$prefs, &$user ) {
+	if( !canUserEmail() ) { return true; }
+	$prefs->mToggles['backup-email'] = $user->getOption( 'wpBackupEmail' );
+	return true;
+}
 
-class WikiBackup {
-	public function __construct( $backupId = false ) {
-		if( !$backupId ) {
-			$dbr =& wfGetDB( DB_SLAVE );
-			$res = $dbr->select( "backups", "backup_jobid", "", 'WikiBackup::checkJob', array( "GROUP BY" => "backup_jobid" );
-			while( $row = $dbr->fetchObject( $res ) ) {
-				$rowcache = $row;
-			}
-			$backupId = ++$rowcache;
-		}
-		$this->backupId = $backupId;
-	}
+function BackupSavePreferences( $form, $user ) {
+	$user->setOption( 'wpBackupEmail', $form->mToggles['backup-email'] );
+	return true;
+}
 
-	public function execute( $user ) {
-		global $wgBackupPath, $wgBackupName, $IP;
-		execInBackground( "$IP/extensions/WikiBackup", 'DumpDatabase.php', "$wgBackupPath $wgBackupName $this->backupId $user" );
-	}
+/************************************
+	MAGIC WORD FUNCTIONS
+ ************************************/
 
-	public function delete( $backupId = $this->backupId ) {
-		global $wgBackupPath, $wgBackupName, $IP;
-		$dbr =& wfGetDB( DB_SLAVE );
-		$res = $dbr->select( "backups", "timestamp", array( "backup_jobid" => $backupId ), 'WikiBackup::checkJob' );
-		$timestamp = $dbr->fetchObject( $res );
-		unlink( "$wgBackupPath/$wgBackupName$timestamp.sql.gz" );
-		unlink( "$wgBackupPath/$wgBackupName$timestamp.xml.gz" );
-		$dbr->delete( "backups", array( "backup_jobid" => $backupId ), "WikiBackup::delete" );
-	}
+function BackupParserSetup() {
+	global $wgParser;
+	$wgParser->setFunctionHook( 'backup', 'BackupParserRender' );
+	return true;
+}
 
-	public function checkJob( $backupId = $this->backupId ) {
-		$dbr =& wfGetDB( DB_SLAVE );
-		$res = $dbr->select( "backups", "status", array( "backup_jobid" => $backupId ), 'WikiBackup::checkJob' );
-		$status = $dbr->fetchObject( $res );
-		return $status;
-	}
+function BackupParserMagic( &$magicWords, $langCode ) {
+	$magicWords[ 'backup' ] = array( 0, strtolower( wfMsg( 'backup' ) ) );
+	return true;
+}
 
-	public function generateJobList() {
-		$dbr =& wfGetDB( DB_SLAVE );
-		$res = $dbr->selectRow( "backups", "*", "", "WikiBackup::generateJobList", array( "GROUP BY" => "timestamp" ) );
-		$jobs = array();
+function BackupParserRender( &$parser, $jobid = '', $displaytext = '' ) {
+	global $wgBackupPath, $wgBackupName;
+	$dbr =& wfGetDB( DB_SLAVE );
+	if( $jobid == '' || !$jobid ) {
+		$res = $dbr->select( "backups", "backup_jobid", "", 'BackupParserRender', array( "GROUP BY" => "backup_jobid" ) );
 		while( $row = $dbr->fetchObject( $res ) ) {
-			$jobs[] = $row;
+			$rowcache = $row;
 		}
-		return $jobs;
+		$jobid = $rowcache;
 	}
-
-	private function execInBackground( $path, $exe, $args = "" ) {
-		global $conf;
-		if( file_exists( $path . $exe ) ) {
-			chdir( $path );
-			if ( substr( php_uname(), 0, 7 ) == "Windows" ){
-				pclose( popen( "start \"bla\" \"" . escapeshellcmd( $exe ) . "\" " . escapeshellarg( $args ), "r" ) );
-			} else {
-				exec( "./" . escapeshellcmd( $exe ) . " " . escapeshellarg( $args ) . " > /dev/null &" );   
-			}
-		}
-	}
-
-	public $backupId = false;
+	$timestamp = $dbr->fetchObject( $dbr->select( 'backups', 'timestamp', array( 'backup_jobid' => $jobid ) ) );
+	if( $displaytext != '' ) { $displayText = " " . $displayText; }
+		return "[" . $wgBackupPath . "/" . $wgBackupName . $timestamp . ".xml.gz" . htmlspecialchars( $displayText ) . "]";
 }
