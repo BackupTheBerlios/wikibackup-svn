@@ -28,6 +28,7 @@ $wgAutoloadClasses['SpecialBackup'] = $dir . 'WikiBackup_body.php';
 $wgExtensionMessagesFiles['SpecialBackup'] = $dir . 'WikiBackup.i18n.php';
 $wgSpecialPages['Backup'] = 'SpecialBackup';
 
+// Credits
 $wgExtensionCredits[ 'specialpage' ][] = array(
         'name'           => "WikiBackup",
         'description'    => "Makes complete backups of the MediaWiki database.",
@@ -37,18 +38,28 @@ $wgExtensionCredits[ 'specialpage' ][] = array(
         'url'            => "http://www.mediawiki.org/wiki/Extension:WikiBackup"
  );
 
-$wgEnotifBackups = true;
+// Sets variable defaults if not already set
+if( !isset( $wgBackupPath ) ) {
+	$wgBackupPath = 'backups';
+}
+if( !isset( $wgBackupName ) ) {
+	$wgBackupName = 'wikibackup-';
+}
+if( !isset( $wgEnotifBackups ) ) {
+	$wgEnotifBackups = true;
+}
 
 // Displays message at logon
-$wgHooks['UserLoginComplete'][] = 'fnBackupNotify';
+$wgHooks['ArticleViewHeader'][] = 'fnArticleViewHeader';
+
 // Adds notification preferences
-global $wgEnotifBackups;
 if( $wgEnotifBackups === true ) {
 	$wgHooks['InitPreferencesForm'][] = 'BackupInitPreferencesForm';
 	$wgHooks['PreferencesUserInformationPanel'][] = "BackupRenderPreferencesForm";
 	$wgHooks['ResetPreferences'][] = 'BackupResetPreferences';
 	$wgHooks['SavePreferences'][] = 'BackupSavePreferences';
 }
+
 // Adds backup parser functions
 if( $wgEnableBackupMagic === true ) {
 	$wgExtensionFunctions[] = 'BackupParserSetup';
@@ -65,21 +76,24 @@ function canUserEmail() {
 
 
 /**********************************************
-	EMAIL NOTIFICATION FUNCTIONS
+	     NOTIFICATION FUNCTIONS
  **********************************************/
 
 // Adds backup notice if backup is complete.
-function fnBackupNotify( &$user, &$output ) {
-	global $wgArticlePath;
+function fnArticleViewHeader( &$article ) {
+	global $wgArticlePath, $wgOut;
 	$dbr =& wfGetDB( DB_SLAVE );
+
+	// Check status against regex seeing if "DONE" is in status.
 	$lastbackup = $dbr->fetcjObject( $dbr->select( 'user', 'lastbackup', array( 'user_id' => $user->getID() ) ) );
 	if( ereg( "DONE", $lastbackup ) ) {
-		$output .= "<div class=\"usermessage plainlinks\">" . wfMsg( 'backup-notify', $wgArticlePath ) . "</div>";
+		$wgOut->addHtml( "<div class=\"usermessage plainlinks\">" . wfMsg( 'backup-notify', $wgArticlePath ) . "</div>" );
 	}
 	return true;
 }
 
 // Hook for PreferencesForm consructor
+// Initiates the checkbox.
 function BackupInitPreferencesForm( &$prefs, &$request ) {
 	if( !canUserEmail() ) { return true; }
 	$prefs->mToggles['backup-email'] = $request->getVal( 'wpBackupEmail' );
@@ -87,6 +101,8 @@ function BackupInitPreferencesForm( &$prefs, &$request ) {
 }
 
 // Adds checkbox for email notifications of backup completion
+// Actually adds the checkbox.
+// FIXME: Move the checkbox to the email fieldset. There is currently no hook.
 function BackupRenderPreferencesForm( &$form, &$html ) {
 	if( !canUserEmail() ) { return true; }
 	wfLoadExtensionMessages( 'SpecialBackup' );
@@ -101,6 +117,7 @@ function BackupResetPreferences( &$prefs, &$user ) {
 	return true;
 }
 
+// Sets option when saving preferences.
 function BackupSavePreferences( $form, $user ) {
 	$user->setOption( 'wpBackupEmail', $form->mToggles['backup-email'] );
 	return true;
@@ -110,20 +127,26 @@ function BackupSavePreferences( $form, $user ) {
 	MAGIC WORD FUNCTIONS
  ************************************/
 
+// Setting up parser function.
 function BackupParserSetup() {
 	global $wgParser;
 	$wgParser->setFunctionHook( 'backup', 'BackupParserRender' );
 	return true;
 }
 
+// Setting up parser function aliases.
 function BackupParserMagic( &$magicWords, $langCode ) {
 	$magicWords[ 'backup' ] = array( 0, strtolower( wfMsg( 'backup' ) ) );
 	return true;
 }
 
+// Render parser function by retrieving info from DB.
 function BackupParserRender( &$parser, $jobid = '', $displaytext = '' ) {
-	global $wgBackupPath, $wgBackupName;
+	global $wgBackupPath, $wgBackupName, $wgServer, $wgScriptPath;
 	$dbr =& wfGetDB( DB_SLAVE );
+
+	// If jobid is not set, run through database and find the last one.
+	// There is probably a more efficient way of going about this.
 	if( $jobid == '' || !$jobid ) {
 		$res = $dbr->select( "backups", "backup_jobid", "", 'BackupParserRender', array( "GROUP BY" => "backup_jobid" ) );
 		while( $row = $dbr->fetchObject( $res ) ) {
@@ -131,7 +154,20 @@ function BackupParserRender( &$parser, $jobid = '', $displaytext = '' ) {
 		}
 		$jobid = $rowcache;
 	}
+
+	// Fetch timestamp for jobid.
 	$timestamp = $dbr->fetchObject( $dbr->select( 'backups', 'timestamp', array( 'backup_jobid' => $jobid ) ) );
-	if( $displaytext != '' ) { $displayText = " " . $displayText; }
-		return "[" . $wgBackupPath . "/" . $wgBackupName . $timestamp . ".xml.gz" . htmlspecialchars( $displayText ) . "]";
+
+	// If display text is not set, set it to the URL.
+	if( $displaytext == '' ) {
+		$displaytext = $wgServer . $wgScriptPath . "/" . $wgBackupPath . "/" . $wgBackupName . $timestamp . ".xml.gz";
+	}
+
+	// Finally, return external link in wikitext.
+	return "[" . $wgServer . $wgScriptPath . "/" . $wgBackupPath . "/" . $wgBackupName . $timestamp . ".xml.gz " . htmlspecialchars( $displayText ) . "]";
 }
+
+
+
+
+

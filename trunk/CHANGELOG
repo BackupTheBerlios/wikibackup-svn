@@ -1,0 +1,16 @@
+2008-07-07 Tyler Romeo
+
+	*WikiBackup.php: Added more comments.
+
+	Changed hook so user is notified when backup completes, not at login.
+
+	*WikiBackup.php (53): Changed hook from "UserLoginComplete" to "ArticleViewHeader"
+	*WikiBackup.php (83): Changed function to adapt to new hook.
+
+	Fixed parser function so URL to backup download is correct.
+
+	*WikiBackup.php (BackupParserRender): Added global variables $wgServer and $wgScriptPath to URL.
+
+	Fixed parser function so displaytext defaults to URL instead of blank, which would just generate a number.
+
+	*WikiBackup.php (BackupParserRender): Changed if statement to check if displaytext is blank, and set it to the URL if blank.
