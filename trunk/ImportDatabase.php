@@ -27,17 +27,13 @@ $jobid             = $argv[ 3  ];
 $user              = $argv[ 4  ];
 $IP                = $argv[ 5  ];
 $wgDBserver        = $argv[ 6  ];
-$wgDBport          = $argv[ 7  ];
+$wgDBport          = $argv[ 9  ];
 $wgDBuser          = $argv[ 8  ];
 $wgDBpassword      = $argv[ 9  ];
 $wgDBname          = $argv[ 10 ];
 $wgDBprefix        = $argv[ 11 ];
 $wgBackupSleepTime = $argv[ 12 ];
-$email             = $argv[ 13 ];
-$canemail          = $argv[ 14 ];
-$subject           = $argv[ 15 ];
-$message           = $argv[ 16 ];
-$AdminEmail        = $argv[ 17 ];
+$timestamp         = $argv[ 13 ];
 
 // Set defaults if variables not set.
 if( !$wgBackupPath || $wgBackupPath == "" ) { $wgBackupPath = "backups"; }
@@ -45,17 +41,17 @@ if( !$wgBackupName || $wgBackupName == "" ) { $wgBackupName = "backup-"; }
 if(  $wgBackupSleepTime              < 1  ) { $wgBackupSleepTime = 3;    }
 
 // Connect to database and store backup info.
-$db = mysql_connect( "$wgDBserver:$wgDBport", $wgDBuser, $wgDBpassword );
+$db = mysql_connect( $wgDBserver, $wgDBuser, $wgDBpassword );
 mysql_select_db( $wgDBname, $db );
-mysql_query( "INSERT INTO '" . $wgDBprefix . "backups' (backup_jobid, status, timestamp, username) VALUES ('$jobid', 'STARTING', '$timestamp', '$user')" );
-mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-RUNNING' WHERE user_name='$user'" );
+mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING' WHERE backup_jobid='$jobid'" );
+mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING' WHERE user_name='$user'" );
 
-$timestamp = time();
 $xmldump = "$IP/$wgBackupPath/$wgBackupName$timestamp" . ".xml.gz";
 
-chdir( "$IP/maitenance" );
+chdir( "$IP/extensions/WikiBackup/java" );
+$importcommand = "java -server -classpath mysql-connector.jar:mwdumper.jar org.mediawiki.dumper.Dumper --output=mysql://$wgDBserver:$wgDBport/$wgDBname?user=$wgDBuser\&password=$wgDBpassword --format=sql:1.5 $xmldump";
 $descriptorspec = array( array( 'pipe', r ), array( 'pipe', 'w' ), array( 'pipe', 'w' ) );
-$backup = popen( "php dumpBackup.php --full --output=\"gzip:$xmldump\"", $descriptorspec );
+$backup = popen( $importcommand, $descriptorspec );
 if( is_resource( $backup ) ) {
 	fclose( $pipes[ 0 ] );
 	while( $status = fgets( $pipes[ 2 ] ) ) {
@@ -67,8 +63,5 @@ if( is_resource( $backup ) ) {
 	fclose( $pipes[ 2 ] );
 	proc_close( $backup );
 }
-mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='DONE' WHERE backup_jobid='$jobid'" );
-mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$argv[ 3 ]-DONE' WHERE user_name='$user'" );
-if( $canemail ) {
-	mail( $email, $subject, $message, "From: $AdminEmail" );
-}
+mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTED' WHERE backup_jobid='$jobid'" );
+mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTED' WHERE user_name='$user'" );

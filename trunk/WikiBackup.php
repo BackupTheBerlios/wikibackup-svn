@@ -50,10 +50,15 @@ $wgLogNames[   'backup'        ] = 'backup-log-create';
 $wgLogHeaders[ 'backup'        ] = 'backup-log-create-text';
 $wgLogActions[ 'backup'        ] = 'backup-log-create-entry';
 
-$wgLogType[]                     = 'backup';
-$wgLogNames[   'backup-delete' ] = 'backup-delete-log';
-$wgLogHeaders[ 'backup-delete' ] = 'backup-delete-log-text';
-$wgLogActions[ 'backup-delete' ] = 'backup-delete-log-entry';
+$wgLogType[]                     = 'backup-delete';
+$wgLogNames[   'backup-delete' ] = 'backup-log-delete';
+$wgLogHeaders[ 'backup-delete' ] = 'backup-log-delete-text';
+$wgLogActions[ 'backup-delete' ] = 'backup-log-delete-entry';
+
+$wgLogType[]                     = 'backup-import';
+$wgLogNames[   'backup-import' ] = 'backup-log-import';
+$wgLogHeaders[ 'backup-import' ] = 'backup-log-import-text';
+$wgLogActions[ 'backup-import' ] = 'backup-log-import-entry';
 
 /*****************************************************
                      SET HOOKS

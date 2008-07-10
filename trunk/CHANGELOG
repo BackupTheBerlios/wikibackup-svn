@@ -1,3 +1,23 @@
+2008-07-10 Tyler Romeo
+
+	*DumpDatabase.php: Removed extraneous comma from the popen command.
+
+	Added support for different database connection ports.
+
+	*WikiBackup_body.php (WikiBackup.execute): Added $wgDBport to list of arguments given to background script.
+	*DumpDatabase.php: In mysql_connect command, enclosed $wgDBserver in quotations and added $wgDBport to end.
+
+	Added ability to import database dumps.
+
+	*WikiBackup.php: Added new values to LogType arrays to support the 'backup-import' type. Also fixed message names.
+	*WikiBackup.i18n.php: Added new import-backup messages to messages array. Also fixed messaged names for standardization.
+
+	*WikiBackup_body.php (SpecialBackup.execute): Added check for 'backupimport' action.
+	*WikiBackup_body.php (SpecialBackup.importBackup): New function to trigger import function on WikiBackup class.
+	*WikiBackup_body.php (WikiBackup.import): New function to trigger ImportDatabase.php file to import XML dumps.
+
+	*ImportDatabase.php: Added new file to import database. File needs to be changed to dump existing SQL info before importing.
+
 2008-07-09 Tyler Romeo
 
 	Enhanced function commenting to work with Javadoc.
