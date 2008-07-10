@@ -34,11 +34,29 @@ $wgDBname          = $argv[ 10 ];
 $wgDBprefix        = $argv[ 11 ];
 $wgBackupSleepTime = $argv[ 12 ];
 $timestamp         = $argv[ 13 ];
+$wgReadOnlyFile    = $argv[ 14 ];
 
 // Set defaults if variables not set.
 if( !$wgBackupPath || $wgBackupPath == "" ) { $wgBackupPath = "backups"; }
 if( !$wgBackupName || $wgBackupName == "" ) { $wgBackupName = "backup-"; }
 if(  $wgBackupSleepTime              < 1  ) { $wgBackupSleepTime = 3;    }
+
+if( !is_writable( dirname( $wgReadOnlyFile ) ) ) {
+	mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING-ERROR-NOTWRITABLE' WHERE backup_jobid='$jobid'" );
+	mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING-ERROR-NOTWRITABLE' WHERE user_name='$user'" );
+	exit( -1 );
+}
+
+$ReadOnlyFile = @fopen( $wgReadOnlyFile, 'w' );
+if ( false === $ReadOnlyFile ) {
+	$ReadOnlyFile = @fopen( $wgReadOnlyFile, 'a' );
+	if ( false === $ReadOnlyFile ) {
+		mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING-ERROR-NOTWRITABLE' WHERE backup_jobid='$jobid'" );
+		mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING-ERROR-NOTWRITABLE' WHERE user_name='$user'" );
+		exit( -1 );
+	}
+}
+fwrite( $ReadOnlyFile, $Message );
 
 // Connect to database and store backup info.
 $db = mysql_connect( $wgDBserver, $wgDBuser, $wgDBpassword );
@@ -46,6 +64,10 @@ mysql_select_db( $wgDBname, $db );
 mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING' WHERE backup_jobid='$jobid'" );
 mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING' WHERE user_name='$user'" );
 
+//Emptying page, revision, and text tables for import.
+mysql_query( "TRUNCATE TABLE '" . $wgDBprefix . "page'" );
+mysql_query( "TRUNCATE TABLE '" . $wgDBprefix . "revision'" );
+mysql_query( "TRUNCATE TABLE '" . $wgDBprefix . "text'" );
 $xmldump = "$IP/$wgBackupPath/$wgBackupName$timestamp" . ".xml.gz";
 
 chdir( "$IP/extensions/WikiBackup/java" );
@@ -65,3 +87,4 @@ if( is_resource( $backup ) ) {
 }
 mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTED' WHERE backup_jobid='$jobid'" );
 mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTED' WHERE user_name='$user'" );
+unlink( $wgReadOnlyFile );

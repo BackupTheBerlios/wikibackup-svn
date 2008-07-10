@@ -130,8 +130,8 @@ class WikiBackup {
 
 	public function import( $backupId = false ) {
 		if( !$backupId ) { $backupId = $this->backupId(); }
-		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime;
-		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"$IP\" \"$wgDBserver\" \"$wgDBport\" \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\"";
+		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgReadOnlyFile;
+		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"$IP\" \"$wgDBserver\" \"$wgDBport\" \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"$wgReadOnlyFile\" \"" . wfMsg( 'backup-dblock' ) . "\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'ImportDatabase.php', $params );
 		$LogPage = new LogPage( 'backup-import' );
 		$LogPage->addEntry( 'backup-import', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ) );

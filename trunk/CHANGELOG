@@ -15,8 +15,17 @@
 	*WikiBackup_body.php (SpecialBackup.execute): Added check for 'backupimport' action.
 	*WikiBackup_body.php (SpecialBackup.importBackup): New function to trigger import function on WikiBackup class.
 	*WikiBackup_body.php (WikiBackup.import): New function to trigger ImportDatabase.php file to import XML dumps.
+	*java/mwdumper.jar and java/mysql-connector.jar: Added java files that aid in importing the database.
 
 	*ImportDatabase.php: Added new file to import database. File needs to be changed to dump existing SQL info before importing.
+
+	Added feature where scripts locks database when importing.
+
+	*WikiBackup_body.php (WikiBackup.import): Added $wgReadOnlyFile parameter to import script file. Also added message parameter.
+	*ImportDatabase.php: Added code to lock database with message passed by main script.
+	*WikiBackup.i18n.php: Added message for when database is locked.
+
+	*ImportDatabase.php: Added code to truncate revision, page, and text tables for successful import.
 
 2008-07-09 Tyler Romeo
 
