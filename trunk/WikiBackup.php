@@ -23,11 +23,6 @@ if ( !defined( 'MEDIAWIKI' ) ) {
         exit( 1 );
 }
 
-$dir = dirname(__FILE__) . '/';
-$wgAutoloadClasses['SpecialBackup'] = $dir . 'WikiBackup_body.php';
-$wgExtensionMessagesFiles['SpecialBackup'] = $dir . 'WikiBackup.i18n.php';
-$wgSpecialPages['Backup'] = 'SpecialBackup';
-
 // Credits
 $wgExtensionCredits[ 'specialpage' ][] = array(
         'name'           => "WikiBackup",
@@ -36,7 +31,7 @@ $wgExtensionCredits[ 'specialpage' ][] = array(
         'version'        => 0.5,
         'author'         => "Tyler Romeo",
         'url'            => "http://www.mediawiki.org/wiki/Extension:WikiBackup"
- );
+);
 
 // Sets variable defaults if not already set
 if( !isset( $wgBackupPath ) ) {
@@ -48,6 +43,26 @@ if( !isset( $wgBackupName ) ) {
 if( !isset( $wgEnotifBackups ) ) {
 	$wgEnotifBackups = true;
 }
+
+// Setting up Log types.
+$wgLogType[]                     = 'backup';
+$wgLogNames[   'backup'        ] = 'backup-log-create';
+$wgLogHeaders[ 'backup'        ] = 'backup-log-create-text';
+$wgLogActions[ 'backup'        ] = 'backup-log-create-entry';
+
+$wgLogType[]                     = 'backup';
+$wgLogNames[   'backup-delete' ] = 'backup-delete-log';
+$wgLogHeaders[ 'backup-delete' ] = 'backup-delete-log-text';
+$wgLogActions[ 'backup-delete' ] = 'backup-delete-log-entry';
+
+/*****************************************************
+                     SET HOOKS
+ *****************************************************/
+
+$dir = dirname(__FILE__) . '/';
+$wgAutoloadClasses['SpecialBackup'] = $dir . 'WikiBackup_body.php';
+$wgExtensionMessagesFiles['SpecialBackup'] = $dir . 'WikiBackup.i18n.php';
+$wgSpecialPages['Backup'] = 'SpecialBackup';
 
 // Displays message at logon
 $wgHooks['ArticleViewHeader'][] = 'fnArticleViewHeader';
@@ -66,7 +81,22 @@ if( $wgEnableBackupMagic === true ) {
 	$wgHooks['LanugageGetMagic'][] = 'BackupParserMagic';
 }
 
-// Checks if user can receive emails and has a valid email address.
+
+
+
+
+
+
+/**
+ * Function that checks whether a user
+ * has the mysql-backup permission, and
+ * has a valid e-mail address. Uses $wgUser
+ * as the user.
+ *
+ * @return Returns true if user has valid
+ *         email address and mysql-backup
+ *         permission. Returns false otherwise.
+ */
 function canUserEmail() {
 	global $wgUser;
 	$wgUser->load();
@@ -79,8 +109,16 @@ function canUserEmail() {
 	     NOTIFICATION FUNCTIONS
  **********************************************/
 
-// Adds backup notice if backup is complete.
-function fnArticleViewHeader( &$article ) {
+/**
+ * Checks if the user has scheduled a backup,
+ * and if that backup has completed. If those
+ * criteria are met, a notification box is put
+ * in the output buffer.
+ *
+ * @return Always returns true so other hooks
+ *         can run.
+ */
+function fnArticleViewHeader() {
 	global $wgArticlePath, $wgOut;
 	$dbr =& wfGetDB( DB_SLAVE );
 
@@ -92,17 +130,39 @@ function fnArticleViewHeader( &$article ) {
 	return true;
 }
 
-// Hook for PreferencesForm consructor
-// Initiates the checkbox.
+/**
+ * Runs when initializing the preferences form.
+ * Function sets initial value for the checkbox
+ * on the preferences page that allows the server
+ * to email users whose backups have completed.
+ *
+ * @param &$prefs   The class for the Preferences
+ *                  form passed by the hook.
+ * @param &$request The class for the WebRequest
+ *                  submitted by the user. Contains
+ *                  GET and POST variables.
+ *
+ * @return Always returns true so other hooks can run.
+ */
 function BackupInitPreferencesForm( &$prefs, &$request ) {
 	if( !canUserEmail() ) { return true; }
 	$prefs->mToggles['backup-email'] = $request->getVal( 'wpBackupEmail' );
 	return true;
 }
 
-// Adds checkbox for email notifications of backup completion
-// Actually adds the checkbox.
 // FIXME: Move the checkbox to the email fieldset. There is currently no hook.
+/**
+ * Runs when rendering preferences form. Checks 
+ * {@link #canUserEmail() if user can email}, and creates
+ * a checkbox in the preferences form if true. The checkbox
+ * allows users to decide if they want emails sent when
+ * backups they scheduled have finished.
+ *
+ * @param &$form Class for Preferences Form passed by hook.
+ * @param &$html The HTML to add to the preferences form.
+ *
+ * @return Always returns true so other hooks can run.
+ */
 function BackupRenderPreferencesForm( &$form, &$html ) {
 	if( !canUserEmail() ) { return true; }
 	wfLoadExtensionMessages( 'SpecialBackup' );
@@ -110,37 +170,89 @@ function BackupRenderPreferencesForm( &$form, &$html ) {
 	return true;
 }
 
-// Hook for ResetPrefs button
+/**
+ * Gets current user option value for the backup-email checkbox
+ * for resetting the preferences form.
+ *
+ * @param &$form Class for Preferences Form passed by hook.
+ * @param &$user Class for the current user making the request.
+ *
+ * @return Always returns true so other hooks can run.
+ */
 function BackupResetPreferences( &$prefs, &$user ) {
 	if( !canUserEmail() ) { return true; }
 	$prefs->mToggles['backup-email'] = $user->getOption( 'wpBackupEmail' );
 	return true;
 }
 
-// Sets option when saving preferences.
+/**
+ * Sets user option for backup-email checkbox when saving
+ * the Preferences Form.
+ *
+ * @return Always returns true so other hooks can run.
+ */
 function BackupSavePreferences( $form, $user ) {
 	$user->setOption( 'wpBackupEmail', $form->mToggles['backup-email'] );
 	return true;
 }
 
+
+
+
+
+
+
+
 /************************************
 	MAGIC WORD FUNCTIONS
  ************************************/
 
-// Setting up parser function.
+/**
+ * Sets up parser function by setting a function
+ * hook on the global parser element.
+ *
+ * @return Always returns true so other hooks can run.
+ */
 function BackupParserSetup() {
 	global $wgParser;
 	$wgParser->setFunctionHook( 'backup', 'BackupParserRender' );
 	return true;
 }
 
-// Setting up parser function aliases.
+/**
+ * Sets aliases for the backup parser function
+ * depending on the language code given. The alias
+ * is obtained from the system message associated
+ * with the parser function.
+ *
+ * @param &$magicWords An array of magic words aliases
+ *                     for the parser.
+ * @param $langCode    The language code the alias is
+ *                     being requested in.
+ *
+ * @return Always returns true so other hooks can run.
+ */
 function BackupParserMagic( &$magicWords, $langCode ) {
 	$magicWords[ 'backup' ] = array( 0, strtolower( wfMsg( 'backup' ) ) );
 	return true;
 }
 
-// Render parser function by retrieving info from DB.
+/**
+ * Renders the backup parser function. Function first checks if
+ * a job id is set. If not, it defaults it to the last created
+ * job id in the database. The function then queries the database
+ * for information on the job id, and generates a URL for the file
+ * location of the backup associated with the job id. Finally, the
+ * function checks if display text is given, and defaults it to
+ * the URL. The function returns the finished link in wikitext.
+ *
+ * @param &$parser      The class for the parser passed by the hook.
+ * @param  $jobid       The job id for the backup the user is requesting.
+ * @param  $displaytext The text to be displayed in the link for the
+ *                      file if the user does not want just the URL.
+ *
+ * @return Returns the rendered link to the backup file in wikitext.
+ */
 function BackupParserRender( &$parser, $jobid = '', $displaytext = '' ) {
 	global $wgBackupPath, $wgBackupName, $wgServer, $wgScriptPath;
 	$dbr =& wfGetDB( DB_SLAVE );
@@ -166,8 +278,3 @@ function BackupParserRender( &$parser, $jobid = '', $displaytext = '' ) {
 	// Finally, return external link in wikitext.
 	return "[" . $wgServer . $wgScriptPath . "/" . $wgBackupPath . "/" . $wgBackupName . $timestamp . ".xml.gz " . htmlspecialchars( $displayText ) . "]";
 }
-
-
-
-
-

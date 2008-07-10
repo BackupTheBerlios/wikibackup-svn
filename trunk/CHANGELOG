@@ -1,3 +1,16 @@
+2008-07-09 Tyler Romeo
+
+	Enhanced function commenting to work with Javadoc.
+
+	*WikiBackup.php: Added comments according to Javadoc documentation.
+
+	Added logging when creating backups.
+
+	*WikiBackup.php: Added log types to global array of log types and set message names.
+	*WikiBackup_body.php (WikiBackup.execute): Added creation of log entry to function.
+	*WikiBackup_body.php (WikiBackup.delete): Added creation of log entry to function.
+	*WikiBackup.i18n.php: Added messages for log entries and headers as defined in WikiBackup.php.
+
 2008-07-07 Tyler Romeo
 
 	*WikiBackup.php: Added more comments.

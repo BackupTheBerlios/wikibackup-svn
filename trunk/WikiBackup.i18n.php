@@ -22,16 +22,22 @@
 
 $messages = array(
 	'en' => array(
-		'backup'               => 'Backup',
-		'backup-desc'          => 'Makes complete backups of the MediaWiki database.',
-		'backup-title'         => 'Backup the database',
-		'backup-submitted'     => 'Backup $1 has been submitted. Refresh the page occasionally to check its status.',
-		'backup-taken'         => 'Backup $1 is already running.',
-		'backup-deleted'       => 'Backup $1 has been deleted.',
-		'backup-header'        => 'Depending on the size of the wiki, making a backup can take a while.<br />\'\'\'Once deleted, backups cannot be recovered.\'\'\'',
-		'backup-job'           => '$1 [[User:$2|$2]] ([[User talk:$2|talk]] | [[Special:Contributions/$2|contribs]]) created Backup $3. Current Status: [$5$4] $6',
-		'backup-footer'        => '',
-		'backup-notify'        => 'A <a href="$1/Special:Backup">backup</a> you scheduld has completed.',
-		'backup-email-desc'    => 'Backup Emails:',
-		'backup-email-label'   => 'Allow emails to you about completed backups you started.' )
+		'backup'                   => 'Backup',
+		'backup-desc'              => 'Makes complete backups of the MediaWiki database.',
+		'backup-title'             => 'Backup the database',
+		'backup-submitted'         => 'Backup $1 has been submitted. Refresh the page occasionally to check its status.',
+		'backup-taken'             => 'Backup $1 is already running.',
+		'backup-deleted'           => 'Backup $1 has been deleted.',
+		'backup-header'            => 'Depending on the size of the wiki, making a backup can take a while.<br />\'\'\'Once deleted, backups cannot be recovered.\'\'\'',
+		'backup-job'               => '$1 [[User:$2|$2]] ([[User talk:$2|talk]] | [[Special:Contributions/$2|contribs]]) created Backup $3. Current Status: [$5$4] $6',
+		'backup-footer'            => '',
+		'backup-notify'            => 'A <a href="$1/Special:Backup">backup</a> you scheduld has completed.',
+		'backup-email-desc'        => 'Backup Emails:',
+		'backup-email-label'       => 'Allow emails to you about completed backups you started.' )
+		'backup-log-create'        => 'Backup creation log',
+		'backup-log-header-create' => 'A log of all new backups.',
+		'backup-log-entry-create'  => 'created backup $1',
+		'backup-log-delete'        => 'Backup deletion log',
+		'backup-log-header-create' => 'A log of all backup deletions.',
+		'backup-log-entry-create'  => 'deleted backup $1'
 );
