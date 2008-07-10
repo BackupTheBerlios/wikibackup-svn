@@ -38,6 +38,8 @@ class SpecialBackup extends SpecialPage {
 			return $this->executeBackup( $wgRequest->getInt( 'jobid' ), $wgRequest->getText( 'StartJob' ) );
 		} elseif( $wgRequest->getText( 'action' ) == "backupdelete" && $wgRequest->wasPosted() ) {
 			return $this->deleteBackup( $wgRequest->getInt( 'jobid' ) );
+		} elseif( $wgRequest->getText( 'action' ) == "backupimport" && $wgRequest->wasPosted() ) {
+			return $this->importBackup( $wgRequest->getInt( 'jobid' ) );
 		} else {
 			return $this->mainBackupPage();
 		}
@@ -56,6 +58,12 @@ class SpecialBackup extends SpecialPage {
 			sleep( $wgBackupWaitTime );
 		}
 		return $this->mainBackupPage( wfMsg( 'backup-submitted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
+	}
+
+	private function importBackup( $backupId ) {
+		$WikiBackup = new WikiBackup( $backupId );
+		$WikiBackup->import( $backupId );
+		return $this->mainBackupPage( wfMsg( 'backup-imported', $WikiBackup->backupId ), 'mw-lag-normal' );
 	}
 
 	private function deleteBackup( $backupId ) {
@@ -80,11 +88,13 @@ class SpecialBackup extends SpecialPage {
 			if( $Job[ 'status' ] == "DONE" ) {
 				global $wgBackupPath, $wgBackupName, $wgScriptPath;
 				$DeleteButton = "<form action='index.php?title=Special:Backup&action=backupdelete' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Delete' value='Delete' /></form>";
-				$wgOut->addWikiText( wfMsg( 'backup-job', date( "H:i, j F o", $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ], "$wgScriptPath/$wgBackupName " . $Job[ 'timestamp' ], $DeleteButton ) );
-				$wgOut->addWikiText( "\n" );
+				$ImportButton = "<form action='index.php?title=Special:Backup&action=backupimport' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Import' value='Import' /></form>";
+				$wgOut->addWikiText( wfMsg( 'backup-job', date( "H:i, j F o", $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ], "$wgScriptPath/$wgBackupName " . $Job[ 'timestamp' ] ) );
+				$wgOut->addHTML( $DeleteButton, $ImportButton );
+				$wgOut->addHTML( "\n" );
 			} else {
 				$wgOut->addWikiText( wfMsg( 'backup-job', date( "H:i, j F o", $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ] ) );
-				$wgOut->addWikiText( "\n" );
+				$wgOut->addHTML( "\n" );
 			}
 		}
 		$wgOut->addHTML( "</ul>\n" );
@@ -109,13 +119,22 @@ class WikiBackup {
 	}
 
 	public function execute( $user ) {
-		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgEmergencyContact;
+		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgEmergencyContact;
 		$user->load(); $UserCanEmail = ( $user->isAllowed( 'mysql-backup' ) && $user->isEmailConfirmed() && $user->getOption( 'wpBackupEmail' ) );
-		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"" . $this->backupId . "\" \"" . $user->getName() . "\" \"$IP\" \"$wgDBserver\" \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"" . $user->getEmail() . "\" \"$UserCanEmail\"";
+		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"" . $this->backupId . "\" \"" . $user->getName() . "\" \"$IP\" \"$wgDBserver\" \"$wgDBport\"  \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"" . $user->getEmail() . "\" \"$UserCanEmail\"";
 		$params .= " \"" . wfMsg( 'backup-email-subject' ) . "\" \"" . wfMsg( 'backup-email-message' ) . "\" \"$wgEmergencyContact\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'DumpDatabase.php', $params );
 		$LogPage = new LogPage( 'backup' );
 		$LogPage->addEntry( 'backup', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ) );
+	}
+
+	public function import( $backupId = false ) {
+		if( !$backupId ) { $backupId = $this->backupId(); }
+		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime;
+		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"$IP\" \"$wgDBserver\" \"$wgDBport\" \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\"";
+		$this->execInBackground( "$IP/extensions/WikiBackup/", 'ImportDatabase.php', $params );
+		$LogPage = new LogPage( 'backup-import' );
+		$LogPage->addEntry( 'backup-import', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ) );
 	}
 
 	public function delete( $backupId = false ) {
