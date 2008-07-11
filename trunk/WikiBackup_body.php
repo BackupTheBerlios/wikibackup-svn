@@ -129,6 +129,7 @@ class WikiBackup {
 	public function execute( $user ) {
 		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgEmergencyContact;
 		$user->load(); $UserCanEmail = ( $user->isAllowed( 'mysql-backup' ) && $user->isEmailConfirmed() && $user->getOption( 'wpBackupEmail' ) );
+		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, $user ) ) ) { return false; }
 		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"" . $this->backupId . "\" \"" . $user->getName() . "\" \"$IP\" \"$wgDBserver\" \"$wgDBport\"  \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"" . $user->getEmail() . "\" \"$UserCanEmail\"";
 		$params .= " \"" . wfMsg( 'backup-email-subject' ) . "\" \"" . wfMsg( 'backup-email-message' ) . "\" \"$wgEmergencyContact\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'DumpDatabase.php', $params );
@@ -139,6 +140,7 @@ class WikiBackup {
 	public function import( $backupId = false ) {
 		if( !$backupId ) { $backupId = $this->backupId(); }
 		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgReadOnlyFile;
+		if( !wfRunHooks( 'BeforeBackupImport', array( $this ) ) ) { return false; }
 		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"$IP\" \"$wgDBserver\" \"$wgDBport\" \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"$wgReadOnlyFile\" \"" . wfMsg( 'backup-dblock' ) . "\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'ImportDatabase.php', $params );
 		$LogPage = new LogPage( 'backup-import' );
@@ -151,7 +153,7 @@ class WikiBackup {
 		$dbr =& wfGetDB( DB_SLAVE );
 		$res = $dbr->select( "backups", "timestamp", array( "backup_jobid" => $backupId ), 'WikiBackup::checkJob' );
 		$timestamp = $dbr->fetchObject( $res );
-		unlink( "$wgBackupPath/$wgBackupName$timestamp.sql.gz" );
+		if( !wfRunHooks( 'BeforeBackupDeletion', array( $this, "$wgBackupPath/$wgBackupName$timestamp.xml.gz" ) ) ) { return false; }
 		unlink( "$wgBackupPath/$wgBackupName$timestamp.xml.gz" );
 		$dbr->delete( "backups", array( "backup_jobid" => $backupId ), "WikiBackup::delete" );
 		$LogPage = new LogPage( 'backup-delete' );

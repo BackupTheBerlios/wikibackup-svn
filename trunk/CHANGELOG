@@ -32,6 +32,12 @@
 	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Added call to SpecialBackup.clearHeaderMessage after all HTML has been output.
 	*WikiBackup_body.php (SpecialBackup.clearHeaderMessage): New function that clears lastbackup field in user table, which clears header message.
 
+	Added hooks before creation, deletion, and import of backups. The first parameter of each is always the WikiBackup object.
+
+	*WikiBackup_body.php (WikiBackup.execute): Added BeforeBackupCreation hook that can be used to stop the backup if it returns false or reset $UserCanEmail.
+	*WikiBackup_body.php (WikiBackup.import): Added BeforeBackupImport hook that can stop import if it returns false.
+	*WikiBackup_body.php (WikiBackup.delete): Added BeforeBackupDeletion hook that can be used to stop deletion if it returns false.
+
 2008-07-09 Tyler Romeo
 
 	Enhanced function commenting to work with Javadoc.
