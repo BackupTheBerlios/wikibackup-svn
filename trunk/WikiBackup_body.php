@@ -100,7 +100,15 @@ class SpecialBackup extends SpecialPage {
 		$wgOut->addHTML( "</ul>\n" );
 		$wgOut->addWikiText( wfMsg( 'backup-footer' ) . "\n" );
 		unset( $WikiBackup );
+		$this->clearHeaderMessage();
+
 		return true;
+	}
+
+	private function clearHeaderMessage() {
+		global $wgUser;
+		$dbw =& wfGetDB( DB_MASTER );
+		return $dbw->update( 'user', array( 'lastbackup' => '' ), array( 'user_id' => $wgUser->getId() ), "SpecialBackup::clearHeaderMessage" );
 	}
 }
 

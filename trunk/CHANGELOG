@@ -27,6 +27,11 @@
 
 	*ImportDatabase.php: Added code to truncate revision, page, and text tables for successful import.
 
+	Made backup complete header disappear after user visits Special Page.
+
+	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Added call to SpecialBackup.clearHeaderMessage after all HTML has been output.
+	*WikiBackup_body.php (SpecialBackup.clearHeaderMessage): New function that clears lastbackup field in user table, which clears header message.
+
 2008-07-09 Tyler Romeo
 
 	Enhanced function commenting to work with Javadoc.
