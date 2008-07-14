@@ -1,3 +1,20 @@
+2008-07-14 Tyler Romeo
+
+	Changed format of database dump script to use maintenance/commandLine.inc.
+
+	*WikiBackup_body.php (WikiBackup.execute): Removed parameters contained global MediaWiki variables and messages.
+
+	*DumpDatabase.php: Added require for $IP/maintenance/commandLine.inc.
+	*DumpDatabase.php: Reduced number of server arguments and fixed variable check for $wgBackupSleepTime.
+	*DumpDatabase.php: Changed all database queries to use Database class.
+	*DumpDatabase.php: Changed standard mail() function to use the UserMailer class.
+
+	Changed last backup column name in user table to include "user_" prefix".
+
+	*WikiBackup.php (fnArticleViewHeader): Changed queried field from lastbackup to user_lastbackup.
+	*WikiBackup_body.php (SpecialBackup.clearHeaderMessage): Changed queried field from lastbackup to user_lastbackup.
+	*DumpDatabase.php: Changed queried field from lastbackup to user_lastbackup.
+
 2008-07-13 Tyler Romeo
 
 	Added more coding notes to the script.

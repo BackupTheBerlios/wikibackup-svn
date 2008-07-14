@@ -128,7 +128,7 @@ function fnArticleViewHeader() {
 	$dbr =& wfGetDB( DB_SLAVE );
 
 	// Check status against regex seeing if "DONE" is in status.
-	$lastbackup = $dbr->fetcjObject( $dbr->select( 'user', 'lastbackup', array( 'user_id' => $user->getID() ) ) );
+	$lastbackup = $dbr->fetcjObject( $dbr->select( 'user', 'user_lastbackup', array( 'user_id' => $user->getID() ) ) );
 	if( ereg( "DONE", $lastbackup ) ) {
 		$wgOut->addHtml( "<div class=\"usermessage plainlinks\">" . wfMsg( 'backup-notify', $wgArticlePath ) . "</div>" );
 	}

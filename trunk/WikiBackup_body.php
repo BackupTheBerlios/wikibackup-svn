@@ -188,7 +188,7 @@ class SpecialBackup extends SpecialPage {
 	private function clearHeaderMessage() {
 		global $wgUser;
 		$dbw =& wfGetDB( DB_MASTER );
-		return $dbw->update( 'user', array( 'lastbackup' => '' ), array( 'user_id' => $wgUser->getId() ), "SpecialBackup::clearHeaderMessage" );
+		return $dbw->update( 'user', array( 'user_lastbackup' => '' ), array( 'user_id' => $wgUser->getId() ), "SpecialBackup::clearHeaderMessage" );
 	}
 }
 
@@ -236,8 +236,7 @@ class WikiBackup {
 		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgEmergencyContact;
 		$user->load(); $UserCanEmail = ( $user->isAllowed( 'mysql-backup' ) && $user->isEmailConfirmed() && $user->getOption( 'wpBackupEmail' ) );
 		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, $user ) ) ) { return false; }
-		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"" . $this->backupId . "\" \"" . $user->getName() . "\" \"$IP\" \"$wgDBserver\" \"$wgDBport\"  \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"" . $user->getEmail() . "\" \"$UserCanEmail\"";
-		$params .= " \"" . wfMsg( 'backup-email-subject' ) . "\" \"" . wfMsg( 'backup-email-message' ) . "\" \"$wgEmergencyContact\"";
+		$params = "\"" . $this->backupId . "\" \"" . $user->getName() . "\" \"$UserCanEmail\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'DumpDatabase.php', $params );
 		$LogPage = new LogPage( 'backup' );
 		$LogPage->addEntry( 'backup', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ) );

@@ -2,7 +2,6 @@
 
 /*****************************************************************************
 
-
     This file is part of the WikiBackup MediaWiki Extension.
 
     The WikiBackup MediaWiki Extension is free software: you can redistribute
@@ -20,35 +19,21 @@
 
 ****************************************************************************/
 
-// Catch server arguments.
-$wgBackupPath      = $argv[ 1  ];
-$wgBackupName      = $argv[ 2  ];
-$jobid             = $argv[ 3  ];
-$user              = $argv[ 4  ];
-$IP                = $argv[ 5  ];
-$wgDBserver        = $argv[ 6  ];
-$wgDBport          = $argv[ 7  ];
-$wgDBuser          = $argv[ 8  ];
-$wgDBpassword      = $argv[ 9  ];
-$wgDBname          = $argv[ 10 ];
-$wgDBprefix        = $argv[ 11 ];
-$wgBackupSleepTime = $argv[ 12 ];
-$email             = $argv[ 13 ];
-$canemail          = $argv[ 14 ];
-$subject           = $argv[ 15 ];
-$message           = $argv[ 16 ];
-$AdminEmail        = $argv[ 17 ];
+$IP = ( getenv( 'MW_INSTALL_PATH' ) !== false ? getenv( 'MW_INSTALL_PATH' ) : realpath( dirname( __FILE__ ) . '/../..' ) );
+require( "$IP/maintenance/commandLine.inc" );
 
-// Set defaults if variables not set.
-if( !$wgBackupPath || $wgBackupPath == "" ) { $wgBackupPath = "backups"; }
-if( !$wgBackupName || $wgBackupName == "" ) { $wgBackupName = "backup-"; }
-if(  $wgBackupSleepTime              < 1  ) { $wgBackupSleepTime = 3;    }
+$jobid             = $argv[ 1 ];
+$username          = $argv[ 2 ];
+$canemail          = $argv[ 3 ];
+$user              = User::newFromName( $username );
 
-// Connect to database and store backup info.
-$db = mysql_connect( "$wgDBserver:$wgDBport", $wgDBuser, $wgDBpassword );
-mysql_select_db( $wgDBname, $db );
-mysql_query( "INSERT INTO '" . $wgDBprefix . "backups' (backup_jobid, status, timestamp, username) VALUES ('$jobid', 'STARTING', '$timestamp', '$user')" );
-mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-RUNNING' WHERE user_name='$user'" );
+if( !$wgBackupPath || $wgBackupPath == ""   ) { $wgBackupPath = "backups"; }
+if( !$wgBackupName || $wgBackupName == ""   ) { $wgBackupName = "backup-"; }
+if(  $wgBackupSleepTime             == NULL ) { $wgBackupSleepTime = 3;    }
+
+$dbw =& wfGetDB( DB_MASTER );
+$dbw->insert( "backups", array( 'backup_jobid' => $jobid, 'status' => 'STARTING', 'timestamp' => $timestamp, 'username' => $username ) );
+$dbw->update( "user", array( 'user_lastbackup' => $jobid . '-RUNNING' ), array( 'user_name' => $username ) );
 
 $timestamp = time();
 $xmldump = "$IP/$wgBackupPath/$wgBackupName$timestamp" . ".xml.gz";
@@ -67,8 +52,11 @@ if( is_resource( $backup ) ) {
 	fclose( $pipes[ 2 ] );
 	proc_close( $backup );
 }
-mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='DONE' WHERE backup_jobid='$jobid'" );
-mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$argv[ 3 ]-DONE' WHERE user_name='$user'" );
+$dbw->update( 'backups', array( 'status' => 'DONE' ), array( 'backup_jobid' => $jobid ) );
+$dbw->update( 'user', array( 'user_lastbackup' => $jobid . '-DONE' ), array( 'user_name' => $username ) );
+
 if( $canemail ) {
-	mail( $email, $subject, $message, "From: $AdminEmail" );
+	$to = new MailAddress( $user );
+	$from = new MailAddress( $wgEmergencyContact );
+	UserMailer::send( $to, $from, wfMsg( 'backup-email-subject' ), wfMsg( 'backup-email-message' ) );
 }
