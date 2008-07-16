@@ -35,7 +35,7 @@ $messages = array(
 		'backup-footer'           => '',
 		'backup-notify'           => 'A <a href="$1/Special:Backup">backup</a> you scheduld has completed.',
 		'backup-email-desc'       => 'Backup Emails:',
-		'backup-email-label'      => 'Allow emails to you about completed backups you started.' )
+		'backup-email-label'      => 'Allow emails to you about completed backups you started.',
 		'backup-log-create'       => 'Backup creation log',
 		'backup-log-create-text'  => 'A log of all new backups.',
 		'backup-log-create-entry' => 'created backup $1',
@@ -45,4 +45,5 @@ $messages = array(
 		'backup-log-import'       => 'Backup import log',
 		'backup-log-import-text'  => 'A log of each time an XML dump was imported into the database.',
 		'backup-log-import-entry' => 'imported backup $1'
+	)
 );

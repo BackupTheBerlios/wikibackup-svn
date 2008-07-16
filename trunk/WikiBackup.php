@@ -43,6 +43,9 @@ if( !isset( $wgBackupName ) ) {
 if( !isset( $wgEnotifBackups ) ) {
 	$wgEnotifBackups = true;
 }
+if( !isset( $wgEnableBackupMagic ) ) {
+	$wgEnableBackupMagic = true;
+}
 
 // Setting up Log types.
 $wgLogType[]                     = 'backup';
@@ -124,12 +127,12 @@ function canUserEmail() {
  *         can run.
  */
 function fnArticleViewHeader() {
-	global $wgArticlePath, $wgOut;
+	global $wgArticlePath, $wgOut, $wgUser;
 	$dbr =& wfGetDB( DB_SLAVE );
 
 	// Check status against regex seeing if "DONE" is in status.
-	$lastbackup = $dbr->fetcjObject( $dbr->select( 'user', 'user_lastbackup', array( 'user_id' => $user->getID() ) ) );
-	if( ereg( "DONE", $lastbackup ) ) {
+	$lastbackup = $dbr->fetchObject( $dbr->select( 'user', 'user_lastbackup', array( 'user_id' => $wgUser->getID() ) ) );
+	if( ereg( "DONE", $lastbackup->user_lastbackup ) ) {
 		$wgOut->addHtml( "<div class=\"usermessage plainlinks\">" . wfMsg( 'backup-notify', $wgArticlePath ) . "</div>" );
 	}
 	return true;

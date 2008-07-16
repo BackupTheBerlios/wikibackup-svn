@@ -319,6 +319,7 @@ class WikiBackup {
 	 * @param $path The physical path of the program to run.
 	 * @param $exe  The name of the program to run.
 	 * @param $args The arguments to feed to the program.
+	 */
 	private function execInBackground( $path, $exe, $args = "" ) {
 		global $conf;
 		if( file_exists( $path . $exe ) ) {

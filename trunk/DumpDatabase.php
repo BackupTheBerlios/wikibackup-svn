@@ -22,28 +22,29 @@
 $IP = ( getenv( 'MW_INSTALL_PATH' ) !== false ? getenv( 'MW_INSTALL_PATH' ) : realpath( dirname( __FILE__ ) . '/../..' ) );
 require( "$IP/maintenance/commandLine.inc" );
 
-$jobid             = $argv[ 1 ];
-$username          = $argv[ 2 ];
-$canemail          = $argv[ 3 ];
+$jobid             = $argv[ 0 ];
+$username          = $argv[ 1 ];
+$canemail          = $argv[ 2 ];
 $user              = User::newFromName( $username );
 
-if( !$wgBackupPath || $wgBackupPath == ""   ) { $wgBackupPath = "backups"; }
-if( !$wgBackupName || $wgBackupName == ""   ) { $wgBackupName = "backup-"; }
-if(  $wgBackupSleepTime             == NULL ) { $wgBackupSleepTime = 3;    }
+if( !isset( $wgBackupPath      ) ) { $wgBackupPath = "backups"; }
+if( !isset( $wgBackupName      ) ) { $wgBackupName = "backup-"; }
+if( !isset( $wgBackupSleepTime ) ) { $wgBackupSleepTime = 3;    }
+
+$timestamp = time();
 
 $dbw =& wfGetDB( DB_MASTER );
 $dbw->insert( "backups", array( 'backup_jobid' => $jobid, 'status' => 'STARTING', 'timestamp' => $timestamp, 'username' => $username ) );
 $dbw->update( "user", array( 'user_lastbackup' => $jobid . '-RUNNING' ), array( 'user_name' => $username ) );
 
-$timestamp = time();
 $xmldump = "$IP/$wgBackupPath/$wgBackupName$timestamp" . ".xml.gz";
 
-chdir( "$IP/maitenance" );
-$descriptorspec = array( array( 'pipe', r ), array( 'pipe', 'w' ), array( 'pipe', 'w' ) );
-$backup = popen( "php dumpBackup.php --full --output=\"gzip:$xmldump\"", $descriptorspec );
+$maintdir = "$IP/maintenance";
+$descriptorspec = array( array( 'pipe', 'r' ), array( 'pipe', 'w' ), array( 'pipe', 'w' ) );
+$backup = proc_open( "php dumpBackup.php --full --output=\"gzip:$xmldump\"", $descriptorspec, $pipes, $maintdir );
 if( is_resource( $backup ) ) {
 	fclose( $pipes[ 0 ] );
-	while( $status = fgets( $pipes[ 2 ] ) ) {
+	while( $status = fgets( $pipes[ 2 ] ) && !feof( $pipes[ 2 ] ) ) {
 		ereg_replace( "$wgDBname-$wgDBprefix ", "", $status );
 		mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='$status'" );
 		sleep( $wgBackupSleepTime );
