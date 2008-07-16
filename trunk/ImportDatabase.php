@@ -61,9 +61,9 @@ $dbw->update( 'backups', array( 'status' => 'IMPORTING' ), array( 'backup_jobid'
 $dbw->update( 'user', array( 'user_lastbackup' => $jobid . '-IMPORTING' ), array( 'user_name' => $username ) );
 
 //Emptying page, revision, and text tables for import.
-$dbw->query( "TRUNCATE TABLE '" . $wgDBprefix . "page'" );
-$dbw->query( "TRUNCATE TABLE '" . $wgDBprefix . "revision'" );
-$dbw->query( "TRUNCATE TABLE '" . $wgDBprefix . "text'" );
+$dbw->safeQuery( "TRUNCATE TABLE '" . $wgDBprefix . "page'" );
+$dbw->safeQuery( "TRUNCATE TABLE '" . $wgDBprefix . "revision'" );
+$dbw->safeQuery( "TRUNCATE TABLE '" . $wgDBprefix . "text'" );
 
 $xmldump = "$IP/$wgBackupPath/$wgBackupName$timestamp" . ".xml.gz";
 

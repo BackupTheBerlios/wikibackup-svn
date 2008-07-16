@@ -8,6 +8,7 @@
 	*ImportDatabase.php: Fixed array references to $argv. It does not seem to be complying with PHP documentation.
 	*ImportDatabase.php: Reduced number of server arguments.
 	*ImportDatabase.php: Changed all database queries to use Database class.
+	*ImportDatabase.php: Changed TRUNCATE SQL commands to use Database::safeQuery instead of Database::query.
 
 	Fixed identical bugs that were fixed in database dump script found in database import script.
 
