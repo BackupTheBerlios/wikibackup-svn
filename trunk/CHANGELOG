@@ -1,3 +1,46 @@
+2008-07-16
+
+	Changed database import script to use maintenance/commandLine.inc.
+
+	*WikiBackup_body.php (WikiBackup.import): Reduced number of parameters given to script.
+
+	*ImportDatabase.php: Added require for $IP/maintenance/commandLine.inc.
+	*ImportDatabase.php: Fixed array references to $argv. It does not seem to be complying with PHP documentation.
+	*ImportDatabase.php: Reduced number of server arguments.
+	*ImportDatabase.php: Changed all database queries to use Database class.
+
+	Fixed identical bugs that were fixed in database dump script found in database import script.
+
+	*ImportDatabase.php: Changed configuration variable check to use ternary operators in order to simplify code.
+	*ImportDatabase.php: Changed popen to proc_open (that was how it was supposed to be), and put working directory into proc_open() instead of using chdir().
+	*ImportDatabase.php: Added missing quotation marks around 'r' in the $descriptorspec array.
+	*ImportDatabase.php: Added an end of file check to the while loop as a sanity check if fgets returns false unexpectedly for some reason.
+	*ImportDatabase.php: Changed queried field from lastbackup to user_lastbackup.
+
+	Made backupId variable names consistent in main script.
+
+	*WikiBackup_body.php (SpecialBackup.executeBackup): Changed variable name of $jobid to $backupId.
+
+	Changed WikiBackup class to where execute, import, and delete functions use internal variable and user object.
+
+	*WikiBackup_body.php (SpecialBackup.executeBackup,importBackup,deleteBackup): Removed backupId parameter given to WikiBackup::execute,import,delete.
+	*WikiBackup_body.php (SpecialBackup.executeBackup,importBackup,deleteBackup): Added $wgUser as a parameter to the WikiBackup class constructor.
+
+	*WikiBackup_body.php (WikiBackup.__construct): Added $user parameter and added validity check for user parameter.
+	*WikiBackup_body.php (WikiBackup.__construct): Used 'last' SQL function to find last job id instead of time consuming previous method.
+	*WikiBackup_body.php (WikiBackup.execute,import,delete): Removed function parameters and put user and backup id variables in context of the object.
+	*WikiBackup_body.php (WikiBackup.execute,import,delete): Added internal user variable as last parameter for LogPage::addEntry.
+	*WikiBackup_body.php (WikiBackup): Added $user variable to class.
+
+	Made WikiBackup::generateJobList and WikiBackup::checkJob static.
+
+	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Changed call to WikiBackup::generateJobList to be called statically.
+	*WikiBackup_body.php (SpecialBackup::generateJobList,checkJob): Made functions public static and removing $this references.
+
+	Fixed a database access bug.
+
+	*WikiBackup_body.php (WikiBackup.delete): Added call to timestamp parameter in database query for timestamp since Database::fetchObject returns an object, not a string.
+
 2008-07-15 Tyler Romeo
 
 	Fixed major noticeable bugs in main script and in Database dump script.

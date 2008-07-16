@@ -20,30 +20,27 @@
 
 ****************************************************************************/
 
+$IP = ( getenv( 'MW_INSTALL_PATH' ) !== false ? getenv( 'MW_INSTALL_PATH' ) : realpath( dirname( __FILE__ ) . '/../..' ) );
+require( "$IP/maintenance/commandLine.inc" );
+
 // Catch server arguments.
-$wgBackupPath      = $argv[ 1  ];
-$wgBackupName      = $argv[ 2  ];
-$jobid             = $argv[ 3  ];
-$user              = $argv[ 4  ];
-$IP                = $argv[ 5  ];
-$wgDBserver        = $argv[ 6  ];
-$wgDBport          = $argv[ 9  ];
-$wgDBuser          = $argv[ 8  ];
-$wgDBpassword      = $argv[ 9  ];
-$wgDBname          = $argv[ 10 ];
-$wgDBprefix        = $argv[ 11 ];
-$wgBackupSleepTime = $argv[ 12 ];
-$timestamp         = $argv[ 13 ];
-$wgReadOnlyFile    = $argv[ 14 ];
+$jobid             = $argv[ 0 ];
+$username          = $argv[ 1 ];
+$user              = User::newFromName( $username );
 
 // Set defaults if variables not set.
-if( !$wgBackupPath || $wgBackupPath == "" ) { $wgBackupPath = "backups"; }
-if( !$wgBackupName || $wgBackupName == "" ) { $wgBackupName = "backup-"; }
-if(  $wgBackupSleepTime              < 1  ) { $wgBackupSleepTime = 3;    }
+$wgBackupPath        = ( !isset( $wgBackupPath        ) ? "backups"     );
+$wgBackupName        = ( !isset( $wgBackupName        ) ? "wikibackup-" );
+$wgBackupSleepTime   = ( !isset( $wgBackupSleepTime   ) ? 3             );
+
+$dbw =& wfGetDB( DB_MASTER );
+
+// Only one read query to get info.
+$timestamp = $dbw->fetchObject( $dbw->select( "backups", "timestamp", array( 'backup_jobid' => $jobid ) ) )->timestamp;
 
 if( !is_writable( dirname( $wgReadOnlyFile ) ) ) {
-	mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING-ERROR-NOTWRITABLE' WHERE backup_jobid='$jobid'" );
-	mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING-ERROR-NOTWRITABLE' WHERE user_name='$user'" );
+	$dbw->update( 'backups', array( 'status' => 'IMPORTING-ERROR-NOTWRITABLE' ), array( 'backup_jobid' => $jobid ) );
+	$dbw->update( 'user', array( 'user_lastbackup' => $jobid . '-IMPORTING-ERROR-NOTWRITABLE' ), array( 'user_name' => $username ) );
 	exit( -1 );
 }
 
@@ -51,40 +48,40 @@ $ReadOnlyFile = @fopen( $wgReadOnlyFile, 'w' );
 if ( false === $ReadOnlyFile ) {
 	$ReadOnlyFile = @fopen( $wgReadOnlyFile, 'a' );
 	if ( false === $ReadOnlyFile ) {
-		mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING-ERROR-NOTWRITABLE' WHERE backup_jobid='$jobid'" );
-		mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING-ERROR-NOTWRITABLE' WHERE user_name='$user'" );
+		$dbw->update( 'backups', array( 'status' => 'IMPORTING-ERROR-NOTWRITABLE' ), array( 'backup_jobid' => $jobid ) );
+		$dbw->update( 'user', array( 'user_lastbackup' => $jobid . '-IMPORTING-ERROR-NOTWRITABLE' ), array( 'user_name' => $username ) );
 		exit( -1 );
 	}
 }
-fwrite( $ReadOnlyFile, $Message );
+wfLoadExtensionMessages( 'WikiBackup' );
+fwrite( $ReadOnlyFile, wfMsg( 'backup-dblock' );
 
-// Connect to database and store backup info.
-$db = mysql_connect( $wgDBserver, $wgDBuser, $wgDBpassword );
-mysql_select_db( $wgDBname, $db );
-mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTING' WHERE backup_jobid='$jobid'" );
-mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTING' WHERE user_name='$user'" );
+// Store backup info.
+$dbw->update( 'backups', array( 'status' => 'IMPORTING' ), array( 'backup_jobid' => $jobid ) );
+$dbw->update( 'user', array( 'user_lastbackup' => $jobid . '-IMPORTING' ), array( 'user_name' => $username ) );
 
 //Emptying page, revision, and text tables for import.
-mysql_query( "TRUNCATE TABLE '" . $wgDBprefix . "page'" );
-mysql_query( "TRUNCATE TABLE '" . $wgDBprefix . "revision'" );
-mysql_query( "TRUNCATE TABLE '" . $wgDBprefix . "text'" );
+$dbw->query( "TRUNCATE TABLE '" . $wgDBprefix . "page'" );
+$dbw->query( "TRUNCATE TABLE '" . $wgDBprefix . "revision'" );
+$dbw->query( "TRUNCATE TABLE '" . $wgDBprefix . "text'" );
+
 $xmldump = "$IP/$wgBackupPath/$wgBackupName$timestamp" . ".xml.gz";
 
-chdir( "$IP/extensions/WikiBackup/java" );
+$javadir = "$IP/extensions/WikiBackup/java";
 $importcommand = "java -server -classpath mysql-connector.jar:mwdumper.jar org.mediawiki.dumper.Dumper --output=mysql://$wgDBserver:$wgDBport/$wgDBname?user=$wgDBuser\&password=$wgDBpassword --format=sql:1.5 $xmldump";
-$descriptorspec = array( array( 'pipe', r ), array( 'pipe', 'w' ), array( 'pipe', 'w' ) );
-$backup = popen( $importcommand, $descriptorspec );
+$descriptorspec = array( array( 'pipe', 'r' ), array( 'pipe', 'w' ), array( 'pipe', 'w' ) );
+$backup = proc_open( $importcommand, $descriptorspec, $javadir );
 if( is_resource( $backup ) ) {
 	fclose( $pipes[ 0 ] );
-	while( $status = fgets( $pipes[ 2 ] ) ) {
+	while( $status = fgets( $pipes[ 2 ] ) && !feof( $pipes[ 2 ] ) ) {
 		ereg_replace( "$wgDBname-$wgDBprefix ", "", $status );
-		mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='$status'" );
+		$dbw->update( 'backups', array( 'status' => $status ), array( 'backup_jobid' => $jobid ) );
 		sleep( $wgBackupSleepTime );
 	}
 	fclose( $pipes[ 1 ] );
 	fclose( $pipes[ 2 ] );
 	proc_close( $backup );
 }
-mysql_query( "UPDATE '" . $wgDBprefix . "backups' SET status='IMPORTED' WHERE backup_jobid='$jobid'" );
-mysql_query( "UPDATE '" . $wgDBprefix . "user' SET lastbackup='$jobid-IMPORTED' WHERE user_name='$user'" );
+$dbw->update( 'backups', array( 'status' => 'IMPORTED' ), array( 'backup_jobid' => $jobid ) );
+$dbw->update( 'user', array( 'user_lastbackup' => $jobid . '-IMPORTED' ), array( 'user_name' => $username ) );
 unlink( $wgReadOnlyFile );

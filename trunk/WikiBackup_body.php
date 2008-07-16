@@ -86,12 +86,12 @@ class SpecialBackup extends SpecialPage {
 	 * @return Returns the return value of the mainBackupPage
 	 *         function, which is most likely true;
 	 */
-	private function executeBackup( $jobId = false, $test = false ) {
+	private function executeBackup( $backupId = false, $test = false ) {
 		global $wgUser;
 		$wgUser->load();
-		if( $test !== "New Backup" || !$jobId ) { return $this->mainBackupPage(); }
-		$WikiBackup = new WikiBackup( $jobId );
-		$WikiBackup->execute( $wgUser );
+		if( $test !== "New Backup" || !$backupId ) { return $this->mainBackupPage(); }
+		$WikiBackup = new WikiBackup( $backupId, $wgUser );
+		$WikiBackup->execute();
 		global $wgBackupWaitTime;
 		if( $wgBackupWaitTime < 1 ) {
 			sleep( 3 );
@@ -110,8 +110,9 @@ class SpecialBackup extends SpecialPage {
 	 *         function, which is most likely true.
 	 */
 	private function importBackup( $backupId ) {
-		$WikiBackup = new WikiBackup( $backupId );
-		$WikiBackup->import( $backupId );
+		global $wgUser;
+		$WikiBackup = new WikiBackup( $backupId, $wgUser );
+		$WikiBackup->import();
 		return $this->mainBackupPage( wfMsg( 'backup-imported', $WikiBackup->backupId ), 'mw-lag-normal' );
 	}
 
@@ -124,8 +125,8 @@ class SpecialBackup extends SpecialPage {
 	 *         function, which is most likely true.
 	 */
 	private function deleteBackup( $backupId ) {
-		$WikiBackup = new WikiBackup( $backupId );
-		$WikiBackup->delete( $backupId );
+		$WikiBackup = new WikiBackup( $backupId, $wgUser );
+		$WikiBackup->delete();
 		return $this->mainBackupPage( wfMsg( 'backup-deleted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
 	}
 
@@ -154,7 +155,7 @@ class SpecialBackup extends SpecialPage {
 		$wgOut->addWikiText( wfMsg( "backup-header" ) . "\n" );
 		$wgOut->addHTML( "<form action='index.php?title=Special:Backup&action=backupsubmit' method='POST'>" );
 		$wgOut->addHTML( "<input type='hidden' name='jobid' value='" . $WikiBackup->backupId . "' /><input name='StartJob' value='New Backup' type='submit' /></form>\n\n" );
-		$AllJobs = $WikiBackup->generateJobList();
+		$AllJobs = WikiBackup::generateJobList();
 		$wgOut->addHTML( "<ul class='special'>\n" );
 		foreach( $AllJobs as $Job ) {
 			if( $Job[ 'status' ] == "DONE" ) {
@@ -209,17 +210,19 @@ class WikiBackup {
 	 *
 	 * @param $backupId The backup id to set for the class.
 	 */
-	public function __construct( $backupId = false ) {
+	public function __construct( $backupId = false, $user = false ) {
 		$dbr =& wfGetDB( DB_SLAVE );
 		if( !$backupId ) {
-			$res = $dbr->select( "backups", "backup_jobid", "", 'WikiBackup::checkJob', array( "GROUP BY" => "backup_jobid" ) );
-			while( $row = $dbr->fetchObject( $res ) ) {
-				$rowcache = $row;
-			}
-			$backupId = ++$rowcache;
+			$backupId = ++$dbr->select( "backups", "last(backup_jobid)", "", 'WikiBackup::__construct', array( "GROUP BY" => "backup_jobid" ) )->backup_jobid;
 			if( $backupId < 1 ) { $backupId = 1; }
 		}
 		$this->backupId = $backupId;
+
+		if( !$user ) {
+			global $wgUser;
+			$user = $wgUser;
+		}
+		$this-user = $user;
 	}
 
 	/**
@@ -229,56 +232,44 @@ class WikiBackup {
 	 * After starting the backup, it adds an entry to the log
 	 * noting so. Before generating the parameter list, it runs
 	 * the BeforeBackupCreation hook.
-	 *
-	 * @param $user The User object for the user starting the backup.
 	 */
-	public function execute( $user ) {
-		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgEmergencyContact;
-		$user->load(); $UserCanEmail = ( $user->isAllowed( 'mysql-backup' ) && $user->isEmailConfirmed() && $user->getOption( 'wpBackupEmail' ) );
-		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, $user ) ) ) { return false; }
-		$params = "\"" . $this->backupId . "\" \"" . $user->getName() . "\" \"$UserCanEmail\"";
+	public function execute() {
+		$UserCanEmail = ( $this->user->isAllowed( 'mysql-backup' ) && $this->user->isEmailConfirmed() && $this->user->getOption( 'wpBackupEmail' ) );
+		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, $this->user ) ) ) { return false; }
+		$params = "\"" . $this->backupId . "\" \"" . $this->user->getName() . "\" \"$UserCanEmail\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'DumpDatabase.php', $params );
 		$LogPage = new LogPage( 'backup' );
-		$LogPage->addEntry( 'backup', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ) );
+		$LogPage->addEntry( 'backup', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 	}
 
 	/**
 	 * Imports a specific backup into the database. Before generating
 	 * a parameter list for the background script, the BeforeBackupImport
 	 * hook is run.
-	 *
-	 * @param $backupId The backup id to import if different from the one
-	 *                  stored within the class.
 	 */
-	public function import( $backupId = false ) {
-		if( !$backupId ) { $backupId = $this->backupId(); }
-		global $wgBackupPath, $wgBackupName, $IP, $wgDBserver, $wgDBport, $wgDBuser, $wgDBpassword, $wgDBname, $wgDBprefix, $wgBackupSleepTime, $wgReadOnlyFile;
+	public function import() {
 		if( !wfRunHooks( 'BeforeBackupImport', array( $this ) ) ) { return false; }
-		$params = "\"$wgBackupPath\" \"$wgBackupName\" \"$IP\" \"$wgDBserver\" \"$wgDBport\" \"$wgDBuser\" \"$wgDBpassword\" \"$wgDBname\" \"$wgDBprefix\" \"$wgBackupSleepTime\" \"$wgReadOnlyFile\" \"" . wfMsg( 'backup-dblock' ) . "\"";
+		$params = "\"" . $this->backupId . "\" \"" . $this->user->getName() . "\"";
 		$this->execInBackground( "$IP/extensions/WikiBackup/", 'ImportDatabase.php', $params );
 		$LogPage = new LogPage( 'backup-import' );
-		$LogPage->addEntry( 'backup-import', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ) );
+		$LogPage->addEntry( 'backup-import', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 	}
 
 	/**
 	 * Deletes the file and database entry associated with a backup.
 	 * Before deleting the backup, it runs the BeforeBackupDelete
 	 * hook, which can stop the deletion if it returns false.
-	 *
-	 * @param $backupId The backup id to delete if different from the one
-	 *                  stored within the class.
 	 */
-	public function delete( $backupId = false ) {
-		if( !$backupId ) { $backupId = $this->backupId(); }
+	public function delete() {
 		global $wgBackupPath, $wgBackupName, $IP;
 		$dbr =& wfGetDB( DB_SLAVE );
-		$res = $dbr->select( "backups", "timestamp", array( "backup_jobid" => $backupId ), 'WikiBackup::checkJob' );
-		$timestamp = $dbr->fetchObject( $res );
+		$res = $dbr->select( "backups", "timestamp", array( "backup_jobid" => $this->backupId ), 'WikiBackup::delete' );
+		$timestamp = $dbr->fetchObject( $res )->timestamp;
 		if( !wfRunHooks( 'BeforeBackupDeletion', array( $this, "$wgBackupPath/$wgBackupName$timestamp.xml.gz" ) ) ) { return false; }
 		unlink( "$wgBackupPath/$wgBackupName$timestamp.xml.gz" );
-		$dbr->delete( "backups", array( "backup_jobid" => $backupId ), "WikiBackup::delete" );
+		$dbr->delete( "backups", array( "backup_jobid" => $this->backupId ), "WikiBackup::delete" );
 		$LogPage = new LogPage( 'backup-delete' );
-		$LogPage->addEntry( 'backup-delete', Title::newFromText( "Special:Backup" ), "", array( $backupId ) );
+		$LogPage->addEntry( 'backup-delete', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 	}
 
 	/**
@@ -289,8 +280,7 @@ class WikiBackup {
 	 *
 	 * @return Returns the status of the backup job.
 	 */
-	public function checkJob( $backupId = false ) {
-		if( !$backupId ) { $backupId = $this->backupId(); }
+	public static function checkJob( $backupId ) {
 		$dbr =& wfGetDB( DB_SLAVE );
 		$res = $dbr->select( "backups", "status", array( "backup_jobid" => $backupId ), 'WikiBackup::checkJob' );
 		$status = $dbr->fetchObject( $res );
@@ -303,7 +293,7 @@ class WikiBackup {
 	 *
 	 * @return Returns an array of backup information.
 	 */
-	public function generateJobList() {
+	public static function generateJobList() {
 		$dbr =& wfGetDB( DB_SLAVE );
 		$res = $dbr->selectRow( "backups", "*", "", "WikiBackup::generateJobList", array( "GROUP BY" => "timestamp" ) );
 		$jobs = array();
@@ -334,5 +324,6 @@ class WikiBackup {
 		}
 	}
 
-	public $backupId = false;
+	public  $backupId = false;
+	private $user     = false;
 }
