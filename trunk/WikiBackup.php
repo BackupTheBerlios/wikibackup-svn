@@ -34,18 +34,11 @@ $wgExtensionCredits[ 'specialpage' ][] = array(
 );
 
 // Sets variable defaults if not already set
-if( !isset( $wgBackupPath ) ) {
-	$wgBackupPath = 'backups';
-}
-if( !isset( $wgBackupName ) ) {
-	$wgBackupName = 'wikibackup-';
-}
-if( !isset( $wgEnotifBackups ) ) {
-	$wgEnotifBackups = true;
-}
-if( !isset( $wgEnableBackupMagic ) ) {
-	$wgEnableBackupMagic = true;
-}
+$wgBackupPath        = ( !isset( $wgBackupPath        ) ? "backups"     );
+$wgBackupName        = ( !isset( $wgBackupName        ) ? "wikibackup-" );
+$wgEnotifBackups     = ( !isset( $wgEnotifBackups     ) ? true          );
+$wgEnableBackupMagic = ( !isset( $wgEnableBackupMagic ) ? true          );
+$wgBackupSleepTime   = ( !isset( $wgBackupSleepTime   ) ? 3             );
 
 // Setting up Log types.
 $wgLogType[]                     = 'backup';

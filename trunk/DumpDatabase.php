@@ -27,9 +27,9 @@ $username          = $argv[ 1 ];
 $canemail          = $argv[ 2 ];
 $user              = User::newFromName( $username );
 
-if( !isset( $wgBackupPath      ) ) { $wgBackupPath = "backups"; }
-if( !isset( $wgBackupName      ) ) { $wgBackupName = "backup-"; }
-if( !isset( $wgBackupSleepTime ) ) { $wgBackupSleepTime = 3;    }
+$wgBackupPath        = ( !isset( $wgBackupPath        ) ? "backups"     );
+$wgBackupName        = ( !isset( $wgBackupName        ) ? "wikibackup-" );
+$wgBackupSleepTime   = ( !isset( $wgBackupSleepTime   ) ? 3             );
 
 $timestamp = time();
 
