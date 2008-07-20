@@ -31,7 +31,7 @@ $messages = array(
 		'backup-dblock'           => 'The database has been locked because the database is being restored from one of its backups. This might take a while, so please be patient.',
 		'backup-deleted'          => 'Backup $1 has been deleted.',
 		'backup-header'           => 'Depending on the size of the wiki, making a backup can take a while.<br />\'\'\'Once deleted, backups cannot be recovered.\'\'\'',
-		'backup-job'              => '$1 [[User:$2|$2]] ([[User talk:$2|talk]] | [[Special:Contributions/$2|contribs]]) created Backup $3. Current Status: [$5$4] $6',
+		'backup-job'              => '$1 [[User:$2|$2]] ([[User talk:$2|talk]] | [[Special:Contributions/$2|contribs]]) created Backup $3. Current Status: [$5 $4]',
 		'backup-footer'           => '',
 		'backup-notify'           => 'A <a href="$1/Special:Backup">backup</a> you scheduld has completed.',
 		'backup-email-desc'       => 'Backup Emails:',

@@ -1,3 +1,45 @@
+2008-07-20
+
+	NOTICE: AS OF THIS DATE, THE MAIN BACKUP PAGE IS ALMOST FULLY FUNCTION, AND BACKUP SCHEDULING WORKS.
+
+	General Fixes
+
+	*WikiBackup.php: Removing excess parentheses and corrected use of ternary operators in global configuration variable check.
+	*DumpDatabase.php: Removing excess parentheses and corrected use of ternary operators in global configuration variable check.
+
+	*WikiBackup_body.php: Added variable types to function documentation.
+
+	*WikiBackup_body.php (WikiBackup.__construct): Fixed code to check for last backup id.
+	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Fixed link to download backup file.
+	*WikiBackup_body.php (wikiBackup.generateJobList): Changed Database object functions to correctly retrieve backup information.
+	*WikiBackup.i18n.php: Removed excess $6 at end of backup-job message and added space between $4 and $5 to fix link.
+
+	*WikiBackup_body.php (WikiBackup.execute): Made function execute "php.exe" with script as an argument instead of executing directly.
+
+	Changed backups SQL table to store the user's id instead of username.
+
+	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Added code to get username from given user id.
+	*wikibackup.sql: Added file with SQL script to create tables, indices, etc. when installing extension.
+
+	Made new backup button disabled when submitting new backup. FIXME: Make it permanently disable until a user's backup is finished.
+
+	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Added new parameter to add "disabled='disabled'" to new backup button.
+	
+	Fixed function to execute scripts in background.
+
+	*WikiBackup_body.php (WikiBackup.execInBackground): Removed unnecessary file existence check; Added support for argument array; Correctly escaped shell arguments.
+	*WikiBackup_body.php (WikiBackup.execInBackground): Made function use popen/pclose platform independently; Made function insert null file using wfGetNull global function.
+
+	Fixed database dump script to unset SERVER variables before requiring commandLine.inc.
+
+	*DumpDatabase.php: Moved argument variables to top of script; Added code to unset $_SERVER superglobal.
+
+	Changed database dump script.
+
+	*DumpDatabase.php: Removed db query to insert periodic status; CHANGED COMPRESSION FROM ZLIB (GZ) TO 7Z USING INCLUDED EXECUTABLE.
+	*DumpDatabase.php: Added more complete error checking switch using return code of 7zip executable.
+	*Added 7za.exe, which is the stand-alone 7-zip compression executable.
+
 2008-07-16
 
 	Changed database import script to use maintenance/commandLine.inc.

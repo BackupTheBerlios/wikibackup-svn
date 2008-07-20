@@ -49,7 +49,7 @@ class SpecialBackup extends SpecialPage {
 	 * {@link SpecialBackup#mainBackupPage( $msg = false, $error = 'error' )
 	 *  mainBackupPage function}.
 	 *
-	 * @param $par The virtual subpage of the Special page
+	 * @param $par string The virtual subpage of the Special page
 	 *             requested by the user.
 	 *
 	 * @return Returns bool depending on what the action is.
@@ -78,12 +78,12 @@ class SpecialBackup extends SpecialPage {
 	 * First runs some tests on POST variables supplied
 	 * by the calling function before running the backup.
 	 *
-	 * @param $jobId The specific jobid to run.
-	 * @param $test  The value of the submit button on
+	 * @param $jobId int The specific jobid to run.
+	 * @param $test  string The value of the submit button on
 	 *               the original "New Backup" button. Used
 	 *               for testing.
 	 *
-	 * @return Returns the return value of the mainBackupPage
+	 * @return bool Returns the return value of the mainBackupPage
 	 *         function, which is most likely true;
 	 */
 	private function executeBackup( $backupId = false, $test = false ) {
@@ -98,15 +98,15 @@ class SpecialBackup extends SpecialPage {
 		} else {
 			sleep( $wgBackupWaitTime );
 		}
-		return $this->mainBackupPage( wfMsg( 'backup-submitted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
+		return $this->mainBackupPage( wfMsg( 'backup-submitted', $WikiBackup->backupId ), 'mw-lag-warn-normal', true );
 	}
 
 	/**
 	 * Uses the WikiBackup class to import an existent backup.
 	 *
-	 * @param $backupId The ID of the backup to import.
+	 * @param $backupId int The ID of the backup to import.
 	 *
-	 * @return Returns the return value of the mainBackupPage
+	 * @return bool Returns the return value of the mainBackupPage
 	 *         function, which is most likely true.
 	 */
 	private function importBackup( $backupId ) {
@@ -119,9 +119,9 @@ class SpecialBackup extends SpecialPage {
 	/**
 	 * Uses the WikiBackup class to delete an existent backup.
 	 *
-	 * @param $backupId The ID of the backup to delete.
+	 * @param $backupId int The ID of the backup to delete.
 	 *
-	 * @return Returns the return value of the mainBackupPage
+	 * @return bool Returns the return value of the mainBackupPage
 	 *         function, which is most likely true.
 	 */
 	private function deleteBackup( $backupId ) {
@@ -138,14 +138,14 @@ class SpecialBackup extends SpecialPage {
 	 * it into HTML form. Finally, it adds the footer HTML, and uses the
 	 * clearHeaderMessage function to clear any backup completion messages.
 	 *
-	 * @param $msg   The error message to show at the top of the page. Does
+	 * @param $msg   string The error message to show at the top of the page. Does
 	 *               not show if not set.
-	 * @param $error The class for the error div that holds the error message
+	 * @param $error string The class for the error div that holds the error message
 	 *               at the top of the page. The default it 'error'.
 	 *
-	 * @return Always returns true.
+	 * @return bool Always returns true.
 	 */ 
-	private function mainBackupPage( $msg = false, $error = 'error' ) {
+	private function mainBackupPage( $msg = false, $error = 'error', $disablenew = false ) {
 		global $wgOut;
 		$WikiBackup = new WikiBackup();
 		$retval = "";
@@ -154,17 +154,21 @@ class SpecialBackup extends SpecialPage {
 		}
 		$wgOut->addWikiText( wfMsg( "backup-header" ) . "\n" );
 		$wgOut->addHTML( "<form action='index.php?title=Special:Backup&action=backupsubmit' method='POST'>" );
-		$wgOut->addHTML( "<input type='hidden' name='jobid' value='" . $WikiBackup->backupId . "' /><input name='StartJob' value='New Backup' type='submit' /></form>\n\n" );
+		$inputHTML = "<input type='hidden' name='jobid' value='" . $WikiBackup->backupId . "' /><input name='StartJob' value='New Backup' type='submit'";
+		if( $disablenew ) $inputHTML .= " disabled='disabled'";
+		$inputHTML .= " /></form>\n\n";
+		$wgOut->addHTML( $inputHTML );
 		$AllJobs = WikiBackup::generateJobList();
 		$wgOut->addHTML( "<ul class='special'>\n" );
 		foreach( $AllJobs as $Job ) {
+			$JobUser = User::newFromId( $Job[ 'userid' ] );
+			$Job[ 'username' ] = $JobUser->getName();
 			if( $Job[ 'status' ] == "DONE" ) {
-				global $wgBackupPath, $wgBackupName, $wgScriptPath;
+				global $wgBackupPath, $wgBackupName, $wgScriptPath, $wgServer;
 				$DeleteButton = "<form action='index.php?title=Special:Backup&action=backupdelete' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Delete' value='Delete' /></form>";
 				$ImportButton = "<form action='index.php?title=Special:Backup&action=backupimport' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Import' value='Import' /></form>";
-				$wgOut->addWikiText( wfMsg( 'backup-job', date( "H:i, j F o", $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ], "$wgScriptPath/$wgBackupName " . $Job[ 'timestamp' ] ) );
-				$wgOut->addHTML( $DeleteButton, $ImportButton );
-				$wgOut->addHTML( "\n" );
+				$wgOut->addWikiText( wfMsg( 'backup-job', date( "H:i, j F o", $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ], "$wgServer$wgScriptPath/$wgBackupPath/$wgBackupName" . $Job[ 'timestamp' ] . ".xml.7z" ), false );
+				$wgOut->addHTML( $DeleteButton . $ImportButton );
 			} else {
 				$wgOut->addWikiText( wfMsg( 'backup-job', date( "H:i, j F o", $Job[ 'timestamp' ] ), $Job[ 'username' ], $Job[ 'backup_jobid' ], $Job[ 'status' ] ) );
 				$wgOut->addHTML( "\n" );
@@ -183,7 +187,7 @@ class SpecialBackup extends SpecialPage {
 	 * backup message from showing when the user has visited
 	 * this special page.
 	 *
-	 * @return Returns true if the database update was successful.
+	 * @return bool Returns true if the database update was successful.
 	 *         False, otherwise.
 	 */
 	private function clearHeaderMessage() {
@@ -208,12 +212,13 @@ class WikiBackup {
 	 * as a class variable. If not, it queries the database for
 	 * the next unused backup id, and sets that.
 	 *
-	 * @param $backupId The backup id to set for the class.
+	 * @param $backupId int The backup id to set for the class.
 	 */
 	public function __construct( $backupId = false, $user = false ) {
 		$dbr =& wfGetDB( DB_SLAVE );
 		if( !$backupId ) {
-			$backupId = ++$dbr->select( "backups", "last(backup_jobid)", "", 'WikiBackup::__construct', array( "GROUP BY" => "backup_jobid" ) )->backup_jobid;
+			$backupId = $dbr->selectField( "backups", "MAX(backup_jobid) AS backup_jobid", "", 'WikiBackup::__construct' );
+			$backupId++;
 			if( $backupId < 1 ) { $backupId = 1; }
 		}
 		$this->backupId = $backupId;
@@ -222,7 +227,7 @@ class WikiBackup {
 			global $wgUser;
 			$user = $wgUser;
 		}
-		$this-user = $user;
+		$this->user = $user;
 	}
 
 	/**
@@ -234,10 +239,11 @@ class WikiBackup {
 	 * the BeforeBackupCreation hook.
 	 */
 	public function execute() {
+		global $IP;
 		$UserCanEmail = ( $this->user->isAllowed( 'mysql-backup' ) && $this->user->isEmailConfirmed() && $this->user->getOption( 'wpBackupEmail' ) );
 		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, $this->user ) ) ) { return false; }
-		$params = "\"" . $this->backupId . "\" \"" . $this->user->getName() . "\" \"$UserCanEmail\"";
-		$this->execInBackground( "$IP/extensions/WikiBackup/", 'DumpDatabase.php', $params );
+		$params = "\"DumpDatabase.php\" \"" . $this->backupId . "\" \"" . $this->user->getName() . "\" \"$UserCanEmail\"";
+		$this->execInBackground( "$IP/extensions/WikiBackup/", "php", $params );
 		$LogPage = new LogPage( 'backup' );
 		$LogPage->addEntry( 'backup', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 	}
@@ -275,10 +281,10 @@ class WikiBackup {
 	/**
 	 * Checks the status of a certain backup job and returns it.
 	 *
-	 * @param $backupId The backup id to check if different from the one
+	 * @param $backupId int The backup id to check if different from the one
 	 *                  stored within the class.
 	 *
-	 * @return Returns the status of the backup job.
+	 * @return string Returns the status of the backup job.
 	 */
 	public static function checkJob( $backupId ) {
 		$dbr =& wfGetDB( DB_SLAVE );
@@ -291,13 +297,13 @@ class WikiBackup {
 	 * Generates a zero-point array of all open and completed backups.
 	 * Each key has another array containing the backup information.
 	 *
-	 * @return Returns an array of backup information.
+	 * @return array Returns an array of backup information.
 	 */
 	public static function generateJobList() {
 		$dbr =& wfGetDB( DB_SLAVE );
-		$res = $dbr->selectRow( "backups", "*", "", "WikiBackup::generateJobList", array( "GROUP BY" => "timestamp" ) );
+		$res = $dbr->select( "backups", "*", "", "WikiBackup::generateJobList", array( "ORDER BY" => "timestamp" ) );
 		$jobs = array();
-		while( $row = $dbr->fetchObject( $res ) ) {
+		while( $row = $dbr->fetchRow( $res ) ) {
 			$jobs[] = $row;
 		}
 		return $jobs;
@@ -306,22 +312,20 @@ class WikiBackup {
 	/**
 	 * Runs a certain process in the background.
 	 *
-	 * @param $path The physical path of the program to run.
-	 * @param $exe  The name of the program to run.
-	 * @param $args The arguments to feed to the program.
+	 * @param $path string The physical path of the program to run.
+	 * @param $exe  string The name of the program to run.
+	 * @param $args mixed  The arguments to pass to the child process.
 	 */
 	private function execInBackground( $path, $exe, $args = "" ) {
-		global $conf;
-		if( file_exists( $path . $exe ) ) {
-			chdir( $path );
-			if ( wfIsWindows() ){
-				pclose( popen( "start \"MediaWiki\" \"" . escapeshellcmd( $exe ) . "\" " . escapeshellarg( $args ), "r" ) );
-			} else {
-				exec( "./" . escapeshellcmd( $exe ) . " " . escapeshellarg( $args ) . " > /dev/null &" );   
-			}
+		global $conf, $IP;
+		chdir( realpath( $path ) );
+		if( is_array( $args ) ) { explode( " ", $args ); }
+		if ( wfIsWindows() ){
+			$command = "start \"MediaWiki\"" . escapeshellcmd( $exe ) . " $args > " . wfGetNull();
 		} else {
-			die( "File for WikiBackup extension not found." );
+			$command = "./" . escapeshellcmd( $exe ) . " " . escapeshellcmd( $args ) . " > " . wfGetNull() . " &";
 		}
+		pclose( popen( $command, "r" ) );
 	}
 
 	public  $backupId = false;
