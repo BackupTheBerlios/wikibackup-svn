@@ -1,0 +1,11 @@
+Release Notes for WikiBackup 0.5 - 2008-07-07
+
+Version 0.5 marks the original release for the WikiBackup MediaWiki extenison. The script is currently unstable, and requires much more testing. Currently, there is no official documentation for the code, and the code itself needs some more inline comments to help developers, though the code is not too complex.
+
+This software is made specifically to be used with the MediaWiki software. It cannot function whatsoever without it. Please go to <http://www.mediawiki.org> for more info on the MediaWiki software.
+
+This product contains absolutely no guarantee of its quality. This code is released under the GNU General Public License, and is free to be modified, used, and distributed as according to that license.
+
+Contact Info:
+Tyler Romeo
+tylerromeo@gmail.com
