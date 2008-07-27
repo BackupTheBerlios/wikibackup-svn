@@ -27,6 +27,11 @@
 	*install.bat: Added batch script containing prompts that help to auto-install the extension.
 	*install-settings: Added settings file required for the installExtension.php script.
 
+	Adding grouping to documentation.
+
+	*WikiBackup_body.php (SpecialBackup): Added class to Special Page group.
+	*WikiBackup_body.php (WikiBackup): Added class to Dump group.
+
 2008-07-20
 
 	General Fixes

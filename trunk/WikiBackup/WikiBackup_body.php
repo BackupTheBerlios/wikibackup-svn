@@ -28,6 +28,7 @@
  *
  * @author Tyler Romeo
  * @version 0.5
+ * @ingroup Special Page
  */
 class SpecialBackup extends SpecialPage {
 
@@ -200,6 +201,7 @@ class SpecialBackup extends SpecialPage {
  *
  * @author Tyler Romeo
  * @version 0.5
+ * @ingroup Dump
  */
 class WikiBackup {
 
