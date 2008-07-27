@@ -88,16 +88,11 @@ class SpecialBackup extends SpecialPage {
 	 */
 	private function executeBackup( $backupId = false, $test = false ) {
 		global $wgUser;
-		$wgUser->load();
 		if( $test !== "New Backup" || !$backupId ) { return $this->mainBackupPage(); }
 		$WikiBackup = new WikiBackup( $backupId, $wgUser );
 		$WikiBackup->execute();
 		global $wgBackupWaitTime;
-		if( $wgBackupWaitTime < 1 ) {
-			sleep( 3 );
-		} else {
-			sleep( $wgBackupWaitTime );
-		}
+		sleep( $wgBackupWaitTime );
 		return $this->mainBackupPage( wfMsg( 'backup-submitted', $WikiBackup->backupId ), 'mw-lag-warn-normal', true );
 	}
 
@@ -111,6 +106,7 @@ class SpecialBackup extends SpecialPage {
 	 */
 	private function importBackup( $backupId ) {
 		global $wgUser;
+		if( !is_integer( $backupId ) ) { return false; }
 		$WikiBackup = new WikiBackup( $backupId, $wgUser );
 		$WikiBackup->import();
 		return $this->mainBackupPage( wfMsg( 'backup-imported', $WikiBackup->backupId ), 'mw-lag-normal' );
@@ -125,6 +121,7 @@ class SpecialBackup extends SpecialPage {
 	 *         function, which is most likely true.
 	 */
 	private function deleteBackup( $backupId ) {
+		global $wgUser;
 		$WikiBackup = new WikiBackup( $backupId, $wgUser );
 		$WikiBackup->delete();
 		return $this->mainBackupPage( wfMsg( 'backup-deleted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
@@ -163,7 +160,7 @@ class SpecialBackup extends SpecialPage {
 		foreach( $AllJobs as $Job ) {
 			$JobUser = User::newFromId( $Job[ 'userid' ] );
 			$Job[ 'username' ] = $JobUser->getName();
-			if( $Job[ 'status' ] == "DONE" ) {
+			if( $Job[ 'status' ] == "DONE" || "IMPORTED" ) {
 				global $wgBackupPath, $wgBackupName, $wgScriptPath, $wgServer;
 				$DeleteButton = "<form action='index.php?title=Special:Backup&action=backupdelete' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Delete' value='Delete' /></form>";
 				$ImportButton = "<form action='index.php?title=Special:Backup&action=backupimport' method='POST'><input type='hidden' name='jobid' value='" . $Job[ 'backup_jobid' ] . "' /><input type='submit' name='Import' value='Import' /></form>";
@@ -216,14 +213,19 @@ class WikiBackup {
 	 */
 	public function __construct( $backupId = false, $user = false ) {
 		$dbr =& wfGetDB( DB_SLAVE );
-		if( !$backupId ) {
+		    if( is_integer( $backupId ) ) { /* Catch actual backup ids. No action necessary. */ }
+		elseif( is_string(  $backupId ) ) { settype( "integer", $backupId ); }
+		else {
 			$backupId = $dbr->selectField( "backups", "MAX(backup_jobid) AS backup_jobid", "", 'WikiBackup::__construct' );
 			$backupId++;
-			if( $backupId < 1 ) { $backupId = 1; }
+			if( $backupId < 1 || $backupId === false ) { $backupId = 1; }
 		}
 		$this->backupId = $backupId;
 
-		if( !$user ) {
+		    if( is_integer( $user ) ) { $user = User::newFromId( $user   ); }
+		elseif( is_string(  $user ) ) { $user = User::newFromName( $user );
+		elseif( is_object(  $user ) ) && $user instanceof User ) { /* Catch actual user objects. No action necessary. */ }
+		else {
 			global $wgUser;
 			$user = $wgUser;
 		}
@@ -255,8 +257,8 @@ class WikiBackup {
 	 */
 	public function import() {
 		if( !wfRunHooks( 'BeforeBackupImport', array( $this ) ) ) { return false; }
-		$params = "\"" . $this->backupId . "\" \"" . $this->user->getName() . "\"";
-		$this->execInBackground( "$IP/extensions/WikiBackup/", 'ImportDatabase.php', $params );
+		$params = "\"ImportDatabase.php\" \"" . $this->backupId . "\" \"" . $this->user->getName() . "\"";
+		$this->execInBackground( "$IP/extensions/WikiBackup/", "php", $params );
 		$LogPage = new LogPage( 'backup-import' );
 		$LogPage->addEntry( 'backup-import', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 	}
@@ -272,7 +274,7 @@ class WikiBackup {
 		$res = $dbr->select( "backups", "timestamp", array( "backup_jobid" => $this->backupId ), 'WikiBackup::delete' );
 		$timestamp = $dbr->fetchObject( $res )->timestamp;
 		if( !wfRunHooks( 'BeforeBackupDeletion', array( $this, "$wgBackupPath/$wgBackupName$timestamp.xml.gz" ) ) ) { return false; }
-		unlink( "$wgBackupPath/$wgBackupName$timestamp.xml.gz" );
+		if( unlink( "$IP/$wgBackupPath/$wgBackupName$timestamp.xml.7z" ) === false ) { return false; }
 		$dbr->delete( "backups", array( "backup_jobid" => $this->backupId ), "WikiBackup::delete" );
 		$LogPage = new LogPage( 'backup-delete' );
 		$LogPage->addEntry( 'backup-delete', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );

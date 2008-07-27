@@ -1,6 +1,28 @@
-2008-07-20
+2008-07-26 Tyler Romeo
 
-	NOTICE: AS OF THIS DATE, THE MAIN BACKUP PAGE IS ALMOST FULLY FUNCTION, AND BACKUP SCHEDULING WORKS.
+	Changed Import Database script to match changes in Database Dump script.
+
+	*ImportDatabase.php: Moved command line arguments above commandLine.inc include and added code to unset $_SERVER variable.
+	*ImportDatabase.php: Standardized default variable checks.
+	*ImportDatabase.php: Fixed methods used to retrieve backup timestamp.
+	*ImportDatabase.php: Removed database locking code, since database locking will cause the importDump.php script to abort.
+	*ImportDatabase.php: Used Database::tableNames to replace current method of retrieving table names when truncating page, revision, and text tables.
+	*ImportDatabase.php: Added code to unzip database dump from 7z archive.
+	*ImportDatabase.php: Removed unnecessary status checks retrieved from the stdout of the import process.
+	*WikiBackup_body.php (WikiBackup.import): Changed script to make "php" the application to run and make "ImportDatabase.php" an argument.
+
+	Fixed some general bugs and added sanity checks.
+
+	*WikiBackup_body.php (SpecialBackup.executeBackup): Removed code that assigns default value to $wgBackupWaitTime, since default variable values have already been assigned.
+	*WikiBackup_body.php (SpecialBackup.importBackup): Added check to see if $backupId is an integer. If false, return false.
+	*WikiBackup_body.php (SpecialBackup.deleteBackup): Added declaration of $wgUser global.
+	*WikiBackup_body.php (SpecialBackup.mainBackupPage): Made backup page put in link for backup download if status is "IMPORTED" instead of "DONE".
+
+	*WikiBackup_body.php (WikiBackup.__construct): Added support for different type of variable types in function parameters.
+	*WikiBackup_body.php (WikiBackup.delete): Fixed path given to unlink() when deleting backup.
+
+
+2008-07-20
 
 	General Fixes
 
@@ -15,6 +37,8 @@
 	*WikiBackup.i18n.php: Removed excess $6 at end of backup-job message and added space between $4 and $5 to fix link.
 
 	*WikiBackup_body.php (WikiBackup.execute): Made function execute "php.exe" with script as an argument instead of executing directly.
+
+	*WikiBackup_body.php: Fixed hook name for LanguageGetMagic hook (parser function hook).
 
 	Changed backups SQL table to store the user's id instead of username.
 
