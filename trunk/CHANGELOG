@@ -21,6 +21,11 @@
 	*WikiBackup_body.php (WikiBackup.__construct): Added support for different type of variable types in function parameters.
 	*WikiBackup_body.php (WikiBackup.delete): Fixed path given to unlink() when deleting backup.
 
+	Added support for experimental install script (maintenance/installExtension.php used with maintenance/patchSql.php).
+	NOTE: THIS SCRIPT WILL NOT WORK UNTIL THE NEXT MEDIAWIKI RELEASE, SINCE THE patchSql.php FILE IS ONLY IN TRUNK.
+
+	*install.bat: Added batch script containing prompts that help to auto-install the extension.
+	*install-settings: Added settings file required for the installExtension.php script.
 
 2008-07-20
 
