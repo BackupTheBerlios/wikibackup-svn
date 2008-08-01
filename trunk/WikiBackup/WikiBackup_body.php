@@ -67,14 +67,15 @@ class SpecialBackup extends SpecialPage {
 			return false;
 		}
 		$wgOut->setPageTitle( wfMsg( 'backup-title' ) );
-		if( $wgRequest->getText( 'action' ) == "backupsubmit" && $wgRequest->wasPosted() ) {
+		if( !$wgRequest->wasPosted() ) { return $this->mainBackupPage(); }
+		if( $wgRequest->getText( 'action' ) == "backupsubmit" ) {
 			return $this->executeBackup( $wgRequest->getInt( 'jobid' ), $wgRequest->getText( 'StartJob' ) );
-		} elseif( $wgRequest->getText( 'action' ) == "backupdelete" && $wgRequest->wasPosted() ) {
+		} elseif( $wgRequest->getText( 'action' ) == "backupdelete" ) {
 			return $this->deleteBackup( $wgRequest->getInt( 'jobid' ) );
-		} elseif( $wgRequest->getText( 'action' ) == "backupimport" && $wgRequest->wasPosted() ) {
+		} elseif( $wgRequest->getText( 'action' ) == "backupimport" ) {
 			return $this->importBackup( $wgRequest->getInt( 'jobid' ) );
 		} else {
-			return $this->mainBackupPage();
+			return $this->mainBackupPage( wfMsg( "backup-invalidaction", $wgRequest->getText( 'action' ) ) );
 		}
 	}
 
@@ -94,11 +95,12 @@ class SpecialBackup extends SpecialPage {
 	 *         function, which is most likely true;
 	 */
 	private function executeBackup( $backupId = false, $test = false ) {
-		global $wgUser;
-		if( $test !== "New Backup" || !$backupId ) { return $this->mainBackupPage(); }
+		global $wgUser, $wgBackupWaitTime;
+		if( $test !== "New Backup" || !$backupId ) return $this->mainBackupPage();
 		$WikiBackup = new WikiBackup( $backupId, $wgUser );
-		$WikiBackup->execute();
-		global $wgBackupWaitTime;
+		if( $WikiBackup === false ) return false;
+		$html = $WikiBackup->execute();
+		if( !is_bool( $html ) ) $wgOut->addHTML( $html );
 		sleep( $wgBackupWaitTime );
 		return $this->mainBackupPage( wfMsg( 'backup-submitted', $WikiBackup->backupId ), 'mw-lag-warn-normal', true );
 	}
@@ -116,9 +118,11 @@ class SpecialBackup extends SpecialPage {
 	 */
 	private function importBackup( $backupId ) {
 		global $wgUser;
-		if( !is_integer( $backupId ) ) { return false; }
+		if( !is_integer( $backupId ) ) return false;
 		$WikiBackup = new WikiBackup( $backupId, $wgUser );
-		$WikiBackup->import();
+		if( $WikiBackup === false ) return false;
+		$html = $WikiBackup->import();
+		if( !is_bool( $html ) ) $wgOut->addHTML( $html );
 		return $this->mainBackupPage( wfMsg( 'backup-imported', $WikiBackup->backupId ), 'mw-lag-normal' );
 	}
 
@@ -137,7 +141,8 @@ class SpecialBackup extends SpecialPage {
 		global $wgUser;
 		$WikiBackup = new WikiBackup( $backupId, $wgUser );
 		if( $WikiBackup === false ) return false;
-		$WikiBackup->delete();
+		$html = $WikiBackup->delete();
+		if( !is_bool( $html ) ) $wgOut->addHTML( $html );
 		return $this->mainBackupPage( wfMsg( 'backup-deleted', $WikiBackup->backupId ), 'mw-lag-warn-normal' );
 	}
 
@@ -243,7 +248,7 @@ class WikiBackup {
 	public function __construct( $backupId = false, $user = false ) {
 		$dbr =& wfGetDB( DB_SLAVE );
 		    if( is_integer( $backupId ) ) { /* Catch actual backup ids. No action necessary. */ }
-		elseif( is_string(  $backupId ) ) { settype( "integer", $backupId ); }
+		elseif( is_string(  $backupId ) ) { $backupId = (integer) $backupId; }
 		else {
 			$backupId = $dbr->selectField( "backups", "MAX(backup_jobid) AS backup_jobid", "", 'WikiBackup::__construct' );
 			$backupId++;
@@ -251,9 +256,9 @@ class WikiBackup {
 		}
 		$this->backupId = $backupId;
 
-		    if( is_integer( $user ) ) { $user = User::newFromId( $user   ); }
-		elseif( is_string(  $user ) ) { $user = User::newFromName( $user );
-		elseif( is_object(  $user ) ) && $user instanceof User ) { /* Catch actual user objects. No action necessary. */ }
+		    if( is_integer( $user ) )  $user = User::newFromId( $user   );
+		elseif( is_string(  $user ) )  $user = User::newFromName( $user );
+		elseif( is_object(  $user ) && $user instanceof User ) { /* Catch actual user objects. No action necessary. */ }
 		else {
 			global $wgUser;
 			$user = $wgUser;
@@ -273,10 +278,10 @@ class WikiBackup {
 	 */
 	public function execute() {
 		global $IP;
-		$UserCanEmail = ( $this->user->isAllowed( 'mysql-backup' ) && $this->user->isEmailConfirmed() && $this->user->getOption( 'wpBackupEmail' ) );
-		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, $this->user ) ) ) { return false; }
-		$params = "\"DumpDatabase.php\" \"" . $this->backupId . "\" \"" . $this->user->getName() . "\" \"$UserCanEmail\"";
-		$this->processStart( "$IP/extensions/WikiBackup/", "php", $params, false, false, false, NULL, true );
+		$UserCanEmail = (bool) ( $this->user->isAllowed( 'mysql-backup' ) && $this->user->isEmailConfirmed() && $this->user->getOption( 'wpBackupEmail' ) );
+		if( !wfRunHooks( 'BeforeBackupCreation', array( $this, &$UserCanEmail, &$html ) ) ) return $html;
+		$params = array( "DumpDatabase.php", $this->backupId, $this->user->getName(), $UserCanEmail );
+		$this->processStart( "$IP/extensions/WikiBackup/", "php", $params, false, $stdout = false, $stderr = false, NULL, true );
 		$LogPage = new LogPage( 'backup' );
 		$LogPage->addEntry( 'backup', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 		return true;
@@ -292,9 +297,9 @@ class WikiBackup {
 	 * @return Returns false if hook stopped import, true otherwise.
 	 */
 	public function import() {
-		if( !wfRunHooks( 'BeforeBackupImport', array( $this ) ) ) { return false; }
-		$params = "\"ImportDatabase.php\" \"" . $this->backupId . "\" \"" . $this->user->getName() . "\"";
-		$this->processStart( "$IP/extensions/WikiBackup/", "php", $params, false, false, false, NULL, true );
+		if( !wfRunHooks( 'BeforeBackupImport', array( $this, &$html ) ) ) return $html;
+		$params = array( "ImportDatabase.php", $this->backupId, $this->user->getName() );
+		$this->processStart( "$IP/extensions/WikiBackup/", "php", $params, false, $stdout = false, $stderr = false, NULL, true );
 		$LogPage = new LogPage( 'backup-import' );
 		$LogPage->addEntry( 'backup-import', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 		return true;
@@ -314,9 +319,9 @@ class WikiBackup {
 		$dbr =& wfGetDB( DB_SLAVE );
 		$timestamp = $dbr->selectField( "backups", "timestamp", array( "backup_jobid" => $this->backupId ), 'WikiBackup::delete' );
 		if( !$timestamp ) return false;
-		if( !wfRunHooks( 'BeforeBackupDeletion', array( $this, "$wgBackupPath/$wgBackupName$timestamp.xml.gz" ) ) ) { return false; }
+		if( !wfRunHooks( 'BeforeBackupDeletion', array( $this, "$wgBackupPath/$wgBackupName$timestamp.xml.gz", &$html ) ) ) return $html;
 		if( unlink( "$IP/$wgBackupPath/$wgBackupName$timestamp.xml.7z" ) === false ) { return false; }
-		$dbr->delete( "backups", array( "backup_jobid" => $this->backupId ), "WikiBackup::delete" ) ) return false;
+		if( !$dbr->delete( "backups", array( "backup_jobid" => $this->backupId ), "WikiBackup::delete" ) ) return false;
 		$LogPage = new LogPage( 'backup-delete' );
 		$LogPage->addEntry( 'backup-delete', Title::newFromText( "Special:Backup" ), "", array( $this->backupId ), $this->user );
 		return true;
@@ -386,9 +391,10 @@ class WikiBackup {
 	 *
 	 * @return int Returns the return code of the child process.
 	 */
-	private function processStart( $path = getcwd(), $cmd = false, $args = NULL, $stdin = false, &$stdout = false, &$stderr = false, $environment = NULL, $background = false ) {
+	private function processStart( $path = false, $cmd = false, $args = NULL, $stdin = false, &$stdout = false, &$stderr = false, $environment = NULL, $background = false ) {
 		try {
 			$olddir = getcwd();
+			if( !$path ) $path = $olddir;
 
 			// BEGIN VARIABLE PROCESSING
 
@@ -421,7 +427,7 @@ class WikiBackup {
 				if( ereg( "[\"\']", $args ) === false ) {
 					$args = explode( " ", $args );
 				} else {
-					$args = preg_split( "[\"\'] [\"\']", $args );
+					$args = preg_split( "/[\"\']/ /[\"\']/", $args );
 				}
 			}
 
@@ -467,15 +473,15 @@ class WikiBackup {
 			$descriptorspec = array();
 			$piperef = array();
 			if( $stdin  !== false ) {
-				array[ 0 ] = array( "pipe", "r" );
+				$descriptorspec[ 0 ] = array( "pipe", "r" );
 				$piperef[] = "stdin";
 			}
 			if( $stdout !== false ) {
-				array[ 1 ] = array( "pipe", "w" );
+				$descriptorspec[ 1 ] = array( "pipe", "w" );
 				$piperef[] = "stdout";
 			}
 			if( $stderr !== false ) {
-				array[ 2 ] = array( "pipe", "w" );
+				$descriptorspec[ 2 ] = array( "pipe", "w" );
 				$piperef[] = "stderr";
 			}
 
@@ -515,3 +521,4 @@ class WikiBackup {
 	private $user     = false;
 }
 
+?>

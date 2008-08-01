@@ -1,3 +1,39 @@
+2008-08-01 Tyler Romeo
+
+	NOTE: THE CREATION OF NEW BACKUPS IS FUNCTIONAL IN THIS VERSION.
+
+	Fixed fatal errors caused by bugs in previous revisions.
+
+	*WikiBackup_body.php (SpecialBackup.executeBackup): Moved declaration of $wgBackupWaitTime global to top with other global.
+	*WikiBackup_body.php (SpecialBackup.executeBackup,importBackup): Added checks to see if WikiBackup constructor returns false.
+
+	*WikiBackup_body.php (WikiBackup.__construct): Used type casting instead of settype() to stop variable referencing error.
+	*WikiBackup_body.php (WikiBackup.execute,import): Fixed passing of reference when calling WikiBackup::processStart.
+	*WikiBackup_body.php (WikiBackup.execute): Used type casting instead of settype() to stop variable referencing error.
+	*WikiBackup_body.php (WikiBackup.delete): Added missing if statement.
+	*WikiBackup_body.php (WikiBackup.processStart): Since using getcwd() in function declaration causes error, changed it to if statement instead.
+	*WikiBackup_body.php (WikiBackup.processStart): Fixed regex patter in preg_split() when splitting arguments.
+	*WikiBackup_body.php (WikiBackup.processStart): Changed accidental calls to "array" to proper call to $descriptorspec when setting pipes.
+
+	Made general code more efficient.
+
+	*WikiBackup_body.php (WikiBackup.execute): Made one wasPosted() check and added an error for invalid actions.
+	*WikiBackup.i18n.php: Added new backup-invalidaction message.
+
+	*WikiBackup_body.php (WikiBackup.__construct): Removed unnecessary braces around single command if statements.
+
+	Added possibility of hooks outputting html.
+
+	*WikiBackup_body.php (WikiBackup.execute,import,delete): Added $html to hook parameter to support returning of HTML.
+	*WikiBackup_body.php (SpecialBackup.executeBackup,importBackup,deleteBackup): Added check for return value of WikiBackup class functions in order to output hook HTML.
+
+2008-07-31 Tyler Romeo
+
+	Rewrote execInBackground function to include more features in case of future development.
+
+	*WikiBackup_body.php (WikiBackup.execInBackground): Replaced function with new function processStart().
+	*WikiBackup_body.php (WikiBackup.execute,import,delete): Changed function names and parameters for new function.
+
 2008-07-26 Tyler Romeo
 
 	Changed Import Database script to match changes in Database Dump script.

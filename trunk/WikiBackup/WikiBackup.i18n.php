@@ -33,6 +33,7 @@ $messages = array(
 		'backup-header'           => 'Depending on the size of the wiki, making a backup can take a while.<br />\'\'\'Once deleted, backups cannot be recovered.\'\'\'',
 		'backup-job'              => '$1 [[User:$2|$2]] ([[User talk:$2|talk]] | [[Special:Contributions/$2|contribs]]) created Backup $3. Current Status: [$5 $4]',
 		'backup-footer'           => '',
+		'backup-invalidaction'    => '"$1" is an invalid page action.',
 		'backup-notify'           => 'A <a href="$1/Special:Backup">backup</a> you scheduld has completed.',
 		'backup-email-desc'       => 'Backup Emails:',
 		'backup-email-label'      => 'Allow emails to you about completed backups you started.',

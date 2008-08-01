@@ -62,7 +62,8 @@ $wgLogActions[ 'backup-import' ] = 'backup-log-import-entry';
 
 $dir = dirname(__FILE__) . '/';
 
-
+$wgAutoloadClasses['SpecialBackup'] = $dir . 'WikiBackup_body.php';
+$wgExtensionMessagesFiles['SpecialBackup'] = $dir . 'WikiBackup.i18n.php';
 $wgSpecialPages['Backup'] = 'SpecialBackup';
 
 // Displays message at logon
